@@ -1,0 +1,12 @@
+setup.py
+src/Main.py
+src/__init__.py
+src/Fit/__init__.py
+src/Fit/data.py
+src/Fit/global.py
+src/Fit/lda.py
+src/Fit/svd.py
+src/PyLDA.egg-info/PKG-INFO
+src/PyLDA.egg-info/SOURCES.txt
+src/PyLDA.egg-info/dependency_links.txt
+src/PyLDA.egg-info/top_level.txt

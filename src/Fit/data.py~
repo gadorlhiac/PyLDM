@@ -1,0 +1,67 @@
+#!/usr/bin/env python
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+from numpy.linalg import *
+
+class Data(object):
+    def __init__(self, f_in):
+        self.times = []
+        self.data = []
+        with open(f_in) as f:
+            i = 0
+            for line in f:
+                if i == 0:
+                    line = line.rstrip()
+                    self.wls = line.split(',')
+                    self.wls = list(map(float,self.wls[1:])) #Change this to change the file formatting!!
+                    i += 1
+                else:
+                    temp = line.split(',')
+                    self.times.append(float(temp[0]))
+                    self.data.append(list(map(float, temp[1:])))
+	self.data = np.array(self.data)
+ 	self.times = np.array(self.times)
+    	self.wls = np.array(self.wls)
+
+	self.izero = np.where(self.times==0)[0]
+	self.wls_work = self.wls
+	self.data_work = self.data[self.izero:,:]
+	self.times_work = self.times[self.izero:]
+	self.U, self.S, self.Vt = np.linalg.svd(self.data_work)
+    
+    def display(self):
+        self.fig_raw_data = plt.figure()
+        self.fig_raw_data.canvas.set_window_title('Raw Data')
+	if self.times_work[0] == 0:
+        	d = plt.contourf(self.wls_work, self.times_work[1:], self.data_work[1:,:])
+	else:
+		d = plt.contourf(self.wls_work, self.times_work, self.data_work)
+        plt.yscale('log')
+        plt.colorbar()
+        plt.draw()
+
+    def get_SVD(self):
+	return self.U, self.S, self.Vt
+
+    def get_IRF(self):
+	pass
+
+    def get_T(self):
+	return self.times_work
+
+    def get_wls(self):
+	return self.wls_work
+
+    def get_data(self):
+	return self.data_work
+
+    def updateBounds(self, wl_lb, wl_ub, t0, t):
+	self.wls_work = self.wls[wl_lb:wl_ub]
+	self.times_work = self.times[t0:t]
+	self.data_work = self.data[t0:t, wl_lb:wl_ub]
+	self.U, self.S, self.Vt = np.linalg.svd(self.data_work)
+
+    def set_GA_taus(self, taus):
+	pass
+	
