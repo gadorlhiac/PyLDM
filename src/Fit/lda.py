@@ -142,7 +142,7 @@ class LDA(object):
 	dx = np.gradient(lx)
 	dy = np.gradient(ly, dx)
 	d2y = np.gradient(dy, dx)
-	k = abs(d2y)/(1+dy**2)**(3/2)
+	k = abs(d2y)/(1+dy**2)**(3./2)
         return k
 
     # Residuals and norms
