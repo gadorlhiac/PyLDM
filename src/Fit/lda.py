@@ -126,43 +126,45 @@ class LDA(object):
 
     # Stores the L-Curve and MPM values
     def _lcurve_MPM(self):
-	if self.simfit:
-	    lcurve_x = np.array([sqrt(self._calc_res(a)) for a in range(len(self.alphas))])
-	    lcurve_y = np.array([self._calc_smoothNorm(a) for a in range(len(self.alphas))])
-	    mpm_y = lcurve_x*lcurve_y
-	else:
-	    lcurve_x = np.array([[self._calc_res(a, wl) for wl in range(len(self.wls))] for a in range(len(self.alphas))])
-	    lcurve_y = np.array([[self._calc_smoothNorm(a, wl) for wl in range(len(self.wls))] for a in range(len(self.alphas))])
-	    mpm_y = lcurve_x*lcurve_y
+        if self.simfit:
+            lcurve_x = np.array([sqrt(self._calc_res(a)) for a in range(len(self.alphas))])
+            lcurve_y = np.array([self._calc_smoothNorm(a) for a in range(len(self.alphas))])
+            mpm_y = lcurve_x*lcurve_y
+        else:
+            lcurve_x = np.array([[self._calc_res(a, wl) for wl in range(len(self.wls))] for a in range(len(self.alphas))])
+            lcurve_y = np.array([[self._calc_smoothNorm(a, wl) for wl in range(len(self.wls))] for a in range(len(self.alphas))])
+            mpm_y = lcurve_x*lcurve_y
         k = self._calc_k(lcurve_x, lcurve_y)
+
+
         return lcurve_x, lcurve_y, mpm_y, k
 
     # Curvature function, for finding optimal alpha on L-curve
     def _calc_k(self, lx, ly):
-	dx = np.gradient(lx)
-	dy = np.gradient(ly, dx)
-	d2y = np.gradient(dy, dx)
-	k = abs(d2y)/(1+dy**2)**(3./2)
+        dx = np.gradient(lx)
+        dy = np.gradient(ly, dx)
+        d2y = np.gradient(dy, dx)
+        k = abs(d2y)/(1+dy**2)**(3./2)
         return k
 
     # Residuals and norms
     def _calc_GCV_res(self, alpha, wl=None):
-	if wl == None:
-	    return sum((self.D.dot(self.x_opts[:, :, alpha])-self.A)**2)
-	else:
-	    return sum((self.D.dot(self.x_opts[:, wl, alpha])-self.A[:, wl])**2)
+        if wl == None:
+            return sum((self.D.dot(self.x_opts[:, :, alpha])-self.A)**2)
+        else:
+            return sum((self.D.dot(self.x_opts[:, wl, alpha])-self.A[:, wl])**2)
 
     def _calc_res(self, alpha, wl=None):
-	if wl == None:
-	    return sum((self.D.dot(self.x_opts[:, :, alpha])-self.A)**2)
-	else:
-	    return sum((self.D.dot(self.x_opts[:, wl, alpha])-self.A[:, wl])**2)
+        if wl == None:
+            return sum((self.D.dot(self.x_opts[:, :, alpha])-self.A)**2)
+        else:
+            return sum((self.D.dot(self.x_opts[:, wl, alpha])-self.A[:, wl])**2)
 
     def _calc_smoothNorm(self, alpha, wl=None):
-	if wl == None:
-	    return sum((self.L.dot(self.x_opts[:, :, alpha]))**2)**(0.5)
-	else:
-	    return sum((self.L.dot(self.x_opts[:, wl, alpha]))**2)**(0.5)
+        if wl == None:
+            return sum((self.L.dot(self.x_opts[:, :, alpha]))**2)**(0.5)
+        else:
+            return sum((self.L.dot(self.x_opts[:, wl, alpha]))**2)**(0.5)
 
 
     ###################
@@ -300,8 +302,8 @@ class LDA(object):
         ax.plot(lx, ly, 'bo-')
         ax.plot(lx[kmin], ly[kmin], 'ro')
         ax.annotate(self.alphas[kmin], (lx[kmin], ly[kmin]))
-	ax.set_yscale('log')
-	ax.set_xscale('log')
+	#ax.set_yscale('log')
+	#ax.set_xscale('log')
         ax2 = fig_lcurve.add_subplot(122)
         ax2.plot(self.alphas, my, 'bo-')
         ax2.plot(self.alphas[mymin], my[mymin], 'ro')
@@ -340,9 +342,9 @@ class LDA(object):
 	ax2 = fig_ldm.add_subplot(122)
 	plt.subplots_adjust(left=0.25, bottom=0.25)
 	axS = plt.axes([0.25, 0.1, 0.65, 0.03])
-        S = Slider(axS, 'alpha', 1, len(self.alphas), valinit=1, valfmt='%0.0f')
+        self.S = Slider(axS, 'alpha', 1, len(self.alphas), valinit=1, valfmt='%0.0f')
         def update(val):
-            n = int(S.val)
+            n = int(self.S.val)
 	    ax.clear()
 	    if self.reg == 'elnet':
 	    	ax.contourf(self.wls, self.taus, self.x_opts[:, :, n, 6], cmap=plt.cm.seismic, levels=Contour_Levels)
@@ -354,7 +356,7 @@ class LDA(object):
 	    ax.set_yscale('log')
 	    ax.legend(loc=0, frameon=False)
 	    plt.draw()
-        S.on_changed(update)
+        self.S.on_changed(update)
 	plt.draw()
 
     # Foward substitution routine, solving lower triangular systems
