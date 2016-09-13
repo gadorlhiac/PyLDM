@@ -27,12 +27,10 @@ class LDA(object):
 
     def run_LDA(self, GA_taus=None):
 	if self.reg == 'L2':
-	    GCVs = self._L2()
+	    GCVs, Cps = self._L2()
 	    lcurve_x, lcurve_y, mpm_y, k = self._lcurve_MPM()
-            self._plot_lcurve_MPM(lcurve_x, lcurve_y, mpm_y, k.argmin(), mpm_y.argmin())
-            #print self.x_opts[:, :, 0]
-	    self._plot_GCV_Cp(GCVs)
-
+            self._plot_lcurve_MPM(lcurve_x, lcurve_y, mpm_y, k.argmax(), mpm_y.argmin())
+	    self._plot_GCV_Cp(GCVs, Cps)
 	elif self.reg == 'L1':
 	    self._L1()
 	elif self.reg == 'elnet':
@@ -88,9 +86,11 @@ class LDA(object):
     def _L2(self):
 	if self.simfit:
 	    GCVs = np.zeros([len(self.alphas)])
+            Cps = np.zeros([len(self.alphas)])
 	else:
 	    GCVs = np.zeros([len(self.wls), len(self.alphas)])
-	#self.var = sum((self.D.dot(self.x_opts[:, :, 0])-self.A)**2)/n
+            Cps = np.zeros([len(self.wls), len(self.alpahs)])
+
 	for alpha in range(len(self.alphas)):
             D_aug = np.concatenate((self.D, self.alphas[alpha]**(0.5)*self.L))
             A_aug = np.concatenate((self.A, np.zeros([len(self.L), len(self.wls)])))
@@ -99,16 +99,23 @@ class LDA(object):
 	    Ut = np.transpose(U)
 	    Sinv = np.diag(1/S)
 	    self.x_opts[:, :, alpha] = V.dot(Sinv).dot(Ut).dot(A_aug)
-	    H = U.dot(Ut)
+	    #H = U.dot(Ut)
+            X = np.transpose(self.D).dot(self.D) + self.alphas[alpha]*np.transpose(self.L).dot(self.L)
+            U, S, Vt = np.linalg.svd(X, full_matrices=False)
+            Xinv = np.transpose(Vt).dot(np.diag(1/S)).dot(np.transpose(U))
+            H = self.D.dot(Xinv).dot(np.transpose(self.D))
+            if alpha == 0:
+                n = len(self.times)
+                self.var = sum((self.D.dot(self.x_opts[:, :, 0])-self.A)**2)/n
 	    GCVs[alpha] = self._calc_GCV(alpha, H)
-	return GCVs
+            Cps[alpha] = self._calc_Cp(alpha, H)
+	return GCVs, Cps
 
     # Calculates GCV
     def _calc_GCV(self, alpha, H):
         n = len(self.times)
 	I = np.identity(len(H))
-	print H.shape
-	tr = (np.trace(I - H))**2
+	tr = (np.trace(I - H)/n)**2
 	if self.simfit:
 	    res = self._calc_GCV_res(alpha)
 	else:
@@ -136,7 +143,6 @@ class LDA(object):
             mpm_y = lcurve_x*lcurve_y
         k = self._calc_k(lcurve_x, lcurve_y)
 
-
         return lcurve_x, lcurve_y, mpm_y, k
 
     # Curvature function, for finding optimal alpha on L-curve
@@ -144,7 +150,7 @@ class LDA(object):
         dx = np.gradient(lx)
         dy = np.gradient(ly, dx)
         d2y = np.gradient(dy, dx)
-        k = abs(d2y)/(1+dy**2)**(3./2)
+        k = abs(d2y)/(1+dy**2)**(1.5)#(3./2)
         return k
 
     # Residuals and norms
@@ -173,7 +179,7 @@ class LDA(object):
 
     # Find LASSO for each alpha
     def _L1(self):
-	#G = self._L2()
+	G = self._L2()
 	for i in range(len(self.alphas)):
 	    alpha = self.alphas[i]
 	    self.x_opts[:, :, i] = self._L1_min(self.D, self.A, alpha)
@@ -252,8 +258,6 @@ class LDA(object):
         x = self._tsvd(k)
         fig_tsvd = plt.figure()
 	fig_tsvd.canvas.set_window_title('TSVD LDM')
-	#Contour_Levels=[-0.001,-0.00075, -0.0005, -0.00025, -0.0001, -0.000075, -0.00005,  0,
-        #        0.00005, 0.000075, 0.0001, 0.00025, 0.0005, 0.00075, 0.001]
 	max_c = np.max(np.absolute(x))
 	num_c = 12
 	C_pos = np.linspace(0, max_c, num_c)
@@ -295,18 +299,18 @@ class LDA(object):
     def display(self):
         pass
 
-    def _plot_lcurve_MPM(self, lx, ly, my, kmin, mymin):
+    def _plot_lcurve_MPM(self, lx, ly, my, kmax, mymin):
         fig_lcurve = plt.figure()
         fig_lcurve.canvas.set_window_title('L-Curve and MPM')
         ax = fig_lcurve.add_subplot(121)
         ax.plot(lx, ly, 'bo-')
-        ax.plot(lx[kmin], ly[kmin], 'ro')
-        ax.annotate(self.alphas[kmin], (lx[kmin], ly[kmin]))
-	#ax.set_yscale('log')
-	#ax.set_xscale('log')
+        ax.plot(lx[kmax], ly[kmax], 'ro')
+        ax.annotate(self.alphas[kmax], (lx[kmax], ly[kmax]))
+        ax.set_title('L-curve')
         ax2 = fig_lcurve.add_subplot(122)
         ax2.plot(self.alphas, my, 'bo-')
         ax2.plot(self.alphas[mymin], my[mymin], 'ro')
+        ax2.set_title('MPM')
         ax2.annotate(self.alphas[mymin], (self.alphas[mymin], my[mymin]))
         plt.draw()
 
@@ -314,15 +318,25 @@ class LDA(object):
 	fig_gcv = plt.figure()
 	fig_gcv.canvas.set_window_title('GCV')
 	ax = fig_gcv.add_subplot(121)
-	ax.plot(self.alphas, GCVs)
+	ax.plot(self.alphas, GCVs, 'bo-')
+        GCVmin = GCVs.argmin()
+        ax.plot(self.alphas[GCVmin], GCVs[GCVmin], 'ro')
+        ax.annotate(self.alphas[GCVmin], (self.alphas[GCVmin], GCVs[GCVmin]))
+        ax.set_title('GCV')
+
+	ax2 = fig_gcv.add_subplot(122)
+	ax2.plot(self.alphas, Cps, 'bo-')
+        Cpmin = Cps.argmin()
+        ax2.plot(self.alphas[Cpmin], Cps[Cpmin], 'ro')
+        ax2.annotate(self.alphas[Cpmin], (self.alphas[Cpmin], Cps[Cpmin]))
+        ax2.set_title('Cp')
 	plt.draw()
 
     def _plot_LDM(self, GA_taus=None):
 	fig_ldm = plt.figure()
-	fig_ldm.canvas.set_window_title('LDM and Contour Selection')
-	ax = fig_ldm.add_subplot(121)
-	#Contour_Levels=[-0.001,-0.00075, -0.0005, -0.00025, -0.0001, -0.000075, -0.00005,  0,
-        #        0.00005, 0.000075, 0.0001, 0.00025, 0.0005, 0.00075, 0.001]
+	fig_ldm.canvas.set_window_title('LDM')
+	#ax = fig_ldm.add_subplot(121)
+        ax = fig_ldm.add_subplot(111)
 	max_c = np.max(np.absolute(self.x_opts[:, :, 0]))
 	if max_c > 0:
 	    num_c = 20
@@ -336,16 +350,26 @@ class LDA(object):
 	else:
             ax.contourf(self.wls, self.taus, self.x_opts[:,:,0], cmap=plt.cm.seismic, levels=Contour_Levels)
 	ax.set_yscale('log')
+        ax.set_title('Alpha = %f' % self.alphas[0])
 	if GA_taus != None:
 	    for i in range(len(GA_taus)):
 		ax.axhline(GA_taus[i], linestyle='dashed', color='k')
-	ax2 = fig_ldm.add_subplot(122)
+	#ax2 = fig_ldm.add_subplot(122)
 	plt.subplots_adjust(left=0.25, bottom=0.25)
 	axS = plt.axes([0.25, 0.1, 0.65, 0.03])
         self.S = Slider(axS, 'alpha', 1, len(self.alphas), valinit=1, valfmt='%0.0f')
         def update(val):
             n = int(self.S.val)
 	    ax.clear()
+            ax.set_title('Alpha = %f' % self.alphas[n])
+	    max_c = np.max(np.absolute(self.x_opts[:, :, n]))
+            if max_c > 0:
+                num_c = 20
+                C_pos = np.linspace(0, max_c, num_c)
+                C_neg = np.linspace(-max_c, 0, num_c, endpoint=False)
+                Contour_Levels = np.concatenate((C_neg, C_pos))
+            else:
+                Contour_Levels = None
 	    if self.reg == 'elnet':
 	    	ax.contourf(self.wls, self.taus, self.x_opts[:, :, n, 6], cmap=plt.cm.seismic, levels=Contour_Levels)
 	    else:
@@ -358,28 +382,3 @@ class LDA(object):
 	    plt.draw()
         self.S.on_changed(update)
 	plt.draw()
-
-    # Foward substitution routine, solving lower triangular systems
-#    def _forwardsub(self, L, b):
-#	X = np.zeros([len(L[0]), len(b[0])])
-#	X[0, :] = b[0, :]/L[0, 0]
-#	for i in range(1, len(b)):
-#	    s = 0
-#	    for k in range(0, i):
-#		s += L[i, k]*X[k, :]
-#	    X[i, :] = (b[i, :] - s)/L[i, i]
-#	return X
-
-    # Back substitution routine to solve least squares
-#    def _backsub(self, R):
-	#Figure out what is wrong with scipy solve_triangular
-#	I = np.identity(len(R))
-#	R_inv = np.zeros([len(R), len(R)])
-#	R_inv[-1, :] = I[-1, :]/R[-1, -1]
-#        for i in range(len(R_inv)-2, -1, -1):
-#            s = 0
-#            for k in range(i+1, len(R_inv)):
-#                s += R[i, k]*R_inv[k, :]
-#            R_inv[i, :] = (I[i, :] - s)/R[i, i]
-#        return R_inv
-

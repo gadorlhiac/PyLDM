@@ -37,15 +37,15 @@ class SVD(object):
         plt.xscale('log')
         plt.legend(loc=0, frameon=False)
 	axS = plt.axes([0.25, 0.1, 0.65, 0.03])
-        S = Slider(axS, 'wLSV', 1, len(self.wLSV[0]), valinit=1, valfmt='%0.0f')
+        self.S = Slider(axS, 'wLSV', 1, len(self.wLSV[0]), valinit=1, valfmt='%0.0f')
         def update(val):
-            n = int(S.val)
+            n = int(self.S.val)
 	    ax2.clear()
 	    ax2.plot(self.T, self.wLSV[:,n-1], 'bo-', label='wLSV %d'%n)
 	    ax2.set_xscale('log')
 	    ax2.legend(loc=0, frameon=False)
 	    plt.draw()
-        S.on_changed(update)
+        self.S.on_changed(update)
 
     def _genD(self, taus, T):
         D = np.zeros([len(T), len(taus)])
