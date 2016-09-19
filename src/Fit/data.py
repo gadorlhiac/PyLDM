@@ -55,6 +55,8 @@ class Data(object):
         self.fig_raw_data.canvas.set_window_title('Raw Data')
 	d = plt.contourf(self.wls, self.times, self.data)
         plt.yscale('symlog', linthreshy=1)
+        plt.ylabel('Time')
+        plt.xlabel('Wavelength')
         plt.colorbar()
         plt.draw()
 

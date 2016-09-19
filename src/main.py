@@ -9,7 +9,7 @@ import Tkinter as tk
 import re
 from tkFileDialog import askopenfilename
 from Fit.lda import *
-from Fit.svd import *
+from Fit.svd_ga import *
 from Fit.data import *
 
 class Main(tk.Frame):
@@ -35,7 +35,7 @@ class Main(tk.Frame):
         self.wl2var = tk.StringVar()
 
         self.fwhmvar = tk.StringVar()
-        self.fwhmvar.set('200')
+        self.fwhmvar.set('0.2')
         self.munotvar = tk.StringVar()
         self.munotvar.set('0')
         self.lamnotvar = tk.StringVar()
@@ -306,7 +306,7 @@ class Main(tk.Frame):
         self.wl1var.set('0')
         self.wl2var.set('-1')
         self.updateIRF()
-	self.SVD = SVD(self.data)
+	self.SVD = SVD_GA(self.data)
 	self.LDAnalyzer = LDA(self.data)
         self.data.display()
 	plt.show()

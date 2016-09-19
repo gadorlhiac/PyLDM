@@ -74,7 +74,7 @@ class LDA(object):
                 One = 0.5*(exp(-t/tau)*exp((self.munot + (self.FWHM_mod**2/(2*tau)))/tau))
                 Two = 1 + erf((t-(self.munot+(self.FWHM_mod**2/tau)))/(sqrt(2)*self.FWHM_mod))
                 D[i, j] = One*Two
-		D[i, j] = exp(-t/tau)
+		#D[i, j] = exp(-t/tau)
 	self.D = np.nan_to_num(D)
 
     ######################
@@ -98,8 +98,7 @@ class LDA(object):
 	    V = np.transpose(Vt)
 	    Ut = np.transpose(U)
 	    Sinv = np.diag(1/S)
-	    self.x_opts[:, :, alpha] = V.dot(Sinv).dot(Ut).dot(A_aug)
-	    #H = U.dot(Ut)
+	    self.x_opts[:, :, alpha] = V.dot(Sinv).dot(Ut).dot(A_aug)	    
             X = np.transpose(self.D).dot(self.D) + self.alphas[alpha]*np.transpose(self.L).dot(self.L)
             U, S, Vt = np.linalg.svd(X, full_matrices=False)
             Xinv = np.transpose(Vt).dot(np.diag(1/S)).dot(np.transpose(U))
@@ -179,7 +178,7 @@ class LDA(object):
 
     # Find LASSO for each alpha
     def _L1(self):
-	G = self._L2()
+	G,C = self._L2()
 	for i in range(len(self.alphas)):
 	    alpha = self.alphas[i]
 	    self.x_opts[:, :, i] = self._L1_min(self.D, self.A, alpha)
@@ -199,25 +198,34 @@ class LDA(object):
 	else:
 	    x = self.x_opts[:, :, 0]
 	cond = np.array([1])
-	while any(cond > 10e-8):
-	    x_old = x
-
-	    U = Dt.dot(A) + B.dot(x_old)
-	    sgn = np.sign(U)
-	    absolutes = np.absolute(U)
-	    zeros = np.zeros([len(U), len(U[0])])
-	    maxes = np.maximum((absolutes - alpha)/g, zeros)
-	    x = sgn*maxes
-	    
-	    diff = x - x_old
-	    diff = np.delete(diff, np.where(x_old==0))
-	    x_old = np.delete(x_old, np.where(x_old==0))
-	    cond = np.divide(diff, x_old)
+        for j in range(len(x[0])):
+            for i in range(len(x)):
+                cond = np.array([1])
+                while cond > 10e-12 and x[i, j] != 0: # Can change tolerance here
+                    x_old = x
+                    U = Dt.dot(A[:,j]) + B.dot(x_old[:,j])
+                    sgn = np.sign(U[i])
+                    absolute = np.absolute(U[i])
+                    x_new = sgn*np.maximum((absolute-alpha)/g, 0)
+                    x[i, j] = x_new[0]
+                    cond = (x_new[0]-x_old[i, j])/x_old[i, j]
 	return x
 
     # Calculate GCV
-    def L1_GCV(self, wl):
+    def _L1curve(self, alpha, wl):
+        #if self.simfit:
+        #    l1y = np.array([sqrt(self._calc_res(a)) for a in range(len(self.alphas))])
+        #    l1x = np.array([self._calc_L1Norm(a) for a in range(len(self.alphas))])
+        #return l1x, l1y
         pass
+    def _calc_M(self, l1x, l1y):
+        pass
+
+    def _calc_L1Norm(self, alpha, wl=None):
+        if wl == None:
+            return sum(abs(self.L.dot(self.x_opts[:, :, alpha])))
+        else:
+            return sum(abs(self.L.dot(self.x_opts[:, wl, alpha])))
 
 
     #########################
@@ -335,8 +343,8 @@ class LDA(object):
     def _plot_LDM(self, GA_taus=None):
 	fig_ldm = plt.figure()
 	fig_ldm.canvas.set_window_title('LDM')
-	#ax = fig_ldm.add_subplot(121)
-        ax = fig_ldm.add_subplot(111)
+	ax = fig_ldm.add_subplot(121)
+        #ax = fig_ldm.add_subplot(111)
 	max_c = np.max(np.absolute(self.x_opts[:, :, 0]))
 	if max_c > 0:
 	    num_c = 20
@@ -346,18 +354,35 @@ class LDA(object):
 	else:
 	    Contour_Levels = None
 	if self.reg == 'elnet':
-            ax.contourf(self.wls, self.taus, self.x_opts[:,:,0, 6], cmap=plt.cm.seismic, levels=Contour_Levels)
+            C = ax.contourf(self.wls, self.taus, self.x_opts[:,:,0, 6], cmap=plt.cm.seismic, levels=Contour_Levels)
 	else:
-            ax.contourf(self.wls, self.taus, self.x_opts[:,:,0], cmap=plt.cm.seismic, levels=Contour_Levels)
+            C = ax.contourf(self.wls, self.taus, self.x_opts[:,:,0], cmap=plt.cm.seismic, levels=Contour_Levels)
+        plt.colorbar(C)
 	ax.set_yscale('log')
+        ax.set_ylabel(r'$\tau$', fontsize=14)
+        ax.set_xlabel('Wavelength', fontsize=14)
         ax.set_title('Alpha = %f' % self.alphas[0])
 	if GA_taus != None:
 	    for i in range(len(GA_taus)):
 		ax.axhline(GA_taus[i], linestyle='dashed', color='k')
-	#ax2 = fig_ldm.add_subplot(122)
+	ax2 = fig_ldm.add_subplot(122)
+        ax2.set_title('Wavelength = %f' % self.wls[0])
+        ax2.plot(self.taus, self.x_opts[:,0,0])
+        ax2.set_xscale('log')
+        ax2.set_xlabel(r'$\tau$', fontsize=14)
+        ax2.set_ylabel('Amplitude', fontsize=14)
+        ax2.yaxis.set_label_position('right')
+        ax2.yaxis.tick_right()
+        ax2.yaxis.label.set_rotation(270)
+        for i in range(len(Contour_Levels)):
+            ax2.axhline(Contour_Levels[i], linestyle='dashed', color='k')
+
 	plt.subplots_adjust(left=0.25, bottom=0.25)
-	axS = plt.axes([0.25, 0.1, 0.65, 0.03])
-        self.S = Slider(axS, 'alpha', 1, len(self.alphas), valinit=1, valfmt='%0.0f')
+	axS = plt.axes([0.25, 0.1, 0.65, 0.03]) # Alpha slider
+        axS2 = plt.axes([0.25, 0.03, 0.65, 0.03]) # Wavelength slider
+        self.S = Slider(axS, 'alpha', 0, len(self.alphas), valinit=0, valfmt='%0.0f')
+        self.S2 = Slider(axS2, 'Wavelength', 0, len(self.wls), valinit=0, valfmt='%0.0f')
+
         def update(val):
             n = int(self.S.val)
 	    ax.clear()
@@ -371,14 +396,30 @@ class LDA(object):
             else:
                 Contour_Levels = None
 	    if self.reg == 'elnet':
-	    	ax.contourf(self.wls, self.taus, self.x_opts[:, :, n, 6], cmap=plt.cm.seismic, levels=Contour_Levels)
+	    	C = ax.contourf(self.wls, self.taus, self.x_opts[:, :, n, 6], cmap=plt.cm.seismic, levels=Contour_Levels)
 	    else:
-	    	ax.contourf(self.wls, self.taus, self.x_opts[:, :, n], cmap=plt.cm.seismic, levels=Contour_Levels)
+	    	C = ax.contourf(self.wls, self.taus, self.x_opts[:, :, n], cmap=plt.cm.seismic, levels=Contour_Levels)
 	    if GA_taus != None:
 	        for i in range(len(GA_taus)):
 		    ax.axhline(GA_taus[i], linestyle='dashed', color='k')
+            plt.colorbar(C)
+            ax.set_ylabel(r'$\tau$', fontsize=14)
+            ax.set_xlabel('Wavelength', fontsize=14)
 	    ax.set_yscale('log')
-	    ax.legend(loc=0, frameon=False)
+
+            wl = int(self.S2.val)
+            ax2.clear()
+            ax2.set_title('Wavelength = %f' % self.wls[wl])
+            ax2.plot(self.taus, self.x_opts[:,wl,n])
+            ax2.set_xscale('log')
+            ax2.set_xlabel(r'$\tau$', fontsize=14)
+            ax2.set_ylabel('Amplitude', fontsize=14)
+            ax2.yaxis.set_label_position('right')
+            ax2.yaxis.tick_right()
+            ax2.yaxis.label.set_rotation(270)
+            for i in range(len(Contour_Levels)):
+                ax2.axhline(Contour_Levels[i], linestyle='dashed', color='k')
 	    plt.draw()
         self.S.on_changed(update)
+        self.S2.on_changed(update)
 	plt.draw()
