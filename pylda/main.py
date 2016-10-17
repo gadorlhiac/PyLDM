@@ -27,6 +27,7 @@ class Main(tk.Frame):
         self.dataWidgets()
 	self.ldaWidgets()
 	self.svdWidgets()
+	self.plotWidgets()
     
     def dataWidgets(self):
         self.tnotvar = tk.StringVar()
@@ -35,7 +36,7 @@ class Main(tk.Frame):
         self.wl2var = tk.StringVar()
 
         self.fwhmvar = tk.StringVar()
-        self.fwhmvar.set('0.2')
+        self.fwhmvar.set('0')
         self.munotvar = tk.StringVar()
         self.munotvar.set('0')
         self.lamnotvar = tk.StringVar()
@@ -298,6 +299,30 @@ class Main(tk.Frame):
 	self.truncDataButton = tk.Button(self.truncDataOptions, text="Truncate", command=self._trunc_data)
 	self.truncDataButton.pack(side='top')
 
+    def plotWidgets(self):
+	self.numCvar = tk.StringVar()
+	self.numCvar.set('10')
+
+	self.plotFrame = tk.Frame(self.svdFrame)
+	self.plotFrame.pack(side='top', fill='both', expand=True, padx=10, pady=10)
+
+	self.plotTitle = tk.Label(self.plotFrame, text="Replot LDM", font="%s underline" % self.font_l)
+	self.plotTitle.pack(side='top', fill='both')
+	
+	self.plotLabels = tk.Frame(self.plotFrame)
+	self.plotLabels.pack(side='left', fill='both', expand=True)
+	self.numContourLabel = tk.Label(self.plotLabels, text='Num Contours', font=self.font_l)
+	self.numContourLabel.pack(side='left', fill='x')
+
+	self.plotEntries = tk.Frame(self.plotFrame)
+	self.plotEntries.pack(side='left', fill='both', expand=True)
+	self.numContours = tk.Entry(self.plotEntries, textvariable=self.numCvar)
+	self.numContours.pack(side='left',fill='x')
+
+	self.rePlotButton = tk.Button(self.plotEntries, text='Replot', command=self.replot)
+	self.rePlotButton.pack(side='left')
+
+
     def load(self):    
         f = askopenfilename()
         self.data = Data(f)
@@ -349,13 +374,17 @@ class Main(tk.Frame):
 	    taus = np.logspace(float(self.taumin.get()), float(self.taumax.get()), float(self.numtau.get()))
 	else:
 	    taus = np.linspace(float(self.taumin.get()), float(self.taumax.get()), float(self.numtau.get()))
-	
-	alphas = np.linspace(float(self.alphamin.get()), float(self.alphamax.get()), float(self.numalphas.get()))
+        alphas = np.linspace(float(self.alphamin.get()), float(self.alphamax.get()), float(self.numalphas.get()))
 	reg = self.regvar.get()
 	L = self.getL(taus)
 	simfit = self.simfitvar.get()
 	self.LDAnalyzer.updateParams(taus, alphas, reg, L, simfit)
 	self.LDAnalyzer.run_LDA(self.GA_taus)
+	plt.show()
+	plt.close()
+
+    def replot(self):
+	self.LDAnalyzer.replot(GA_taus=self.GA_taus, num_c=int(self.numCvar.get()))
 	plt.show()
 	plt.close()
 

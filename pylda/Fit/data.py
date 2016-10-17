@@ -15,7 +15,7 @@ class Data(object):
                 if i == 0:
                     line = line.rstrip()
                     self.wls = line.split(',')
-                    self.wls = list(map(float,self.wls[1:])) #Change this to change the file formatting!!
+                    self.wls = list(map(float,self.wls[1:]))
                     i += 1
                 else:
                     temp = line.split(',')
@@ -73,15 +73,16 @@ class Data(object):
         self.lamnot = lamnot
 
     def fitIRF(self):
-	self.fig_irf_fitting = plt.figure()
-	self.fig_irf_fitting.canvas.set_window_title('Fitting IRF')
-	d = plt.contourf(self.wls, self.times[self.izero-20:self.izero+20], self.data[self.izero-20:self.izero+20, :])
-	p0 = np.array(plt.ginput(12))
-	x = p0[:, 0]
-	y = p0[:, 1]
-	mui = 1
-	popt = curve_fit(self._chirp_min, x, y, (self.munot, mui, self.lamnot))
-	print popt
+	#self.fig_irf_fitting = plt.figure()
+	#self.fig_irf_fitting.canvas.set_window_title('Fitting IRF')
+	#d = plt.contourf(self.wls, self.times[self.izero-20:self.izero+20], self.data[self.izero-20:self.izero+20, :])
+	#p0 = np.array(plt.ginput(12))
+	#x = p0[:, 0]
+	#y = p0[:, 1]
+	#mui = 1
+	#popt = curve_fit(self._chirp_min, x, y, (self.munot, mui, self.lamnot))
+	#print popt
+        pass
 
     def _chirp_min(self, x, munot, mui, lamnot):
 	s = munot

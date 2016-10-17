@@ -38,6 +38,10 @@ class LDA(object):
 	self._plot_LDM(GA_taus)
 	return
 
+    def replot(self, GA_taus=None, num_c=10):
+        plt.close(self.fig_ldm)
+        self._plot_LDM(GA_taus, num_c)
+
     #####################################
     # Data and Initialization Functions #
     #####################################
@@ -59,10 +63,10 @@ class LDA(object):
 	self.L = L
 	self.simfit = simfit
 	self.genD()
-	if self.reg == 'elnet':
-	    self.x_opts = np.zeros([len(self.taus), len(self.wls), len(self.alphas), len(self.rhos)])
-	else:
-            self.x_opts = np.zeros([len(self.taus), len(self.wls), len(self.alphas)])
+	#if self.reg == 'elnet':
+	#    self.x_opts = np.tile(1, (len(self.taus), len(self.wls), len(self.alphas), len(self.rhos)))
+	#else:
+        self.x_opts = np.zeros([len(self.taus), len(self.wls), len(self.alphas)])
 
     # Matrix of Exponential Decays
     def genD(self):
@@ -98,7 +102,7 @@ class LDA(object):
 	    V = np.transpose(Vt)
 	    Ut = np.transpose(U)
 	    Sinv = np.diag(1/S)
-	    self.x_opts[:, :, alpha] = V.dot(Sinv).dot(Ut).dot(A_aug)	    
+	    self.x_opts[:, :, alpha] = V.dot(Sinv).dot(Ut).dot(A_aug)
             X = np.transpose(self.D).dot(self.D) + self.alphas[alpha]*np.transpose(self.L).dot(self.L)
             U, S, Vt = np.linalg.svd(X, full_matrices=False)
             Xinv = np.transpose(Vt).dot(np.diag(1/S)).dot(np.transpose(U))
@@ -149,7 +153,7 @@ class LDA(object):
         dx = np.gradient(lx)
         dy = np.gradient(ly, dx)
         d2y = np.gradient(dy, dx)
-        k = abs(d2y)/(1+dy**2)**(1.5)#(3./2)
+        k = abs(d2y)/(1+dy**2)**(1.5)
         return k
 
     # Residuals and norms
@@ -201,14 +205,15 @@ class LDA(object):
         for j in range(len(x[0])):
             for i in range(len(x)):
                 cond = np.array([1])
-                while cond > 10e-12 and x[i, j] != 0: # Can change tolerance here
+                while cond > 10e-128 and x[i, j] != 0: # Can change tolerance here
                     x_old = x
                     U = Dt.dot(A[:,j]) + B.dot(x_old[:,j])
                     sgn = np.sign(U[i])
                     absolute = np.absolute(U[i])
                     x_new = sgn*np.maximum((absolute-alpha)/g, 0)
-                    x[i, j] = x_new[0]
-                    cond = (x_new[0]-x_old[i, j])/x_old[i, j]
+                    x[i, j] = np.real(x_new[0])
+                    cond = (x[i, j]-x_old[i, j])/x_old[i, j]
+                    print cond
 	return x
 
     # Calculate GCV
@@ -235,6 +240,11 @@ class LDA(object):
     # Calculate Elastic Net Solution for every alpha and rho
     # First creates augmented matrices to remove L2 penalty, reducing problem to a LASSO regularization
     def _elnet(self):
+        G, C = self._L2()
+        x = self.x_opts[:, :, 0]
+        self.x_opts = np.zeros([len(self.taus), len(self.wls), len(self.alphas), len(self.rhos)])
+        self.x_opts[:, :, 0, 0] = x
+        #self.x_opts[:, :, 0, 0] = np.tile(1, (len(self.taus),len(self.wls)))
 	for i in range(len(self.alphas)):
 	    alpha = self.alphas[i]
 	    for j in range(len(self.rhos)):
@@ -281,7 +291,7 @@ class LDA(object):
 
     # Actual solution
     def _tsvd(self, k):
-	D_plus = self._tsvdInv(k)	
+	D_plus = self._tsvdInv(k)
 	x_k = D_plus.dot(self.A)
 	return x_k
 
@@ -303,7 +313,7 @@ class LDA(object):
     #################################
     # Output and Plotting Functions #
     #################################
-    
+
     def display(self):
         pass
 
@@ -340,14 +350,13 @@ class LDA(object):
         ax2.set_title('Cp')
 	plt.draw()
 
-    def _plot_LDM(self, GA_taus=None):
-	fig_ldm = plt.figure()
-	fig_ldm.canvas.set_window_title('LDM')
-	ax = fig_ldm.add_subplot(121)
+    def _plot_LDM(self, GA_taus=None, num_c=10):
+	self.fig_ldm = plt.figure()
+	self.fig_ldm.canvas.set_window_title('LDM')
+	ax = self.fig_ldm.add_subplot(121)
         #ax = fig_ldm.add_subplot(111)
 	max_c = np.max(np.absolute(self.x_opts[:, :, 0]))
 	if max_c > 0:
-	    num_c = 20
 	    C_pos = np.linspace(0, max_c, num_c)
 	    C_neg = np.linspace(-max_c, 0, num_c, endpoint=False)
 	    Contour_Levels = np.concatenate((C_neg, C_pos))
@@ -365,61 +374,89 @@ class LDA(object):
 	if GA_taus != None:
 	    for i in range(len(GA_taus)):
 		ax.axhline(GA_taus[i], linestyle='dashed', color='k')
-	ax2 = fig_ldm.add_subplot(122)
+	ax2 = self.fig_ldm.add_subplot(122)
         ax2.set_title('Wavelength = %f' % self.wls[0])
-        ax2.plot(self.taus, self.x_opts[:,0,0])
+        if self.reg == 'elnet':
+            ax2.plot(self.taus, self.x_opts[:,0,0,6])
+        else:
+            ax2.plot(self.taus, self.x_opts[:,0,0])
         ax2.set_xscale('log')
         ax2.set_xlabel(r'$\tau$', fontsize=14)
         ax2.set_ylabel('Amplitude', fontsize=14)
         ax2.yaxis.set_label_position('right')
         ax2.yaxis.tick_right()
         ax2.yaxis.label.set_rotation(270)
-        for i in range(len(Contour_Levels)):
-            ax2.axhline(Contour_Levels[i], linestyle='dashed', color='k')
+        if len(Contour_Levels) > 0:
+            for i in range(len(Contour_Levels)):
+                ax2.axhline(Contour_Levels[i], linestyle='dashed', color='k')
 
 	plt.subplots_adjust(left=0.25, bottom=0.25)
 	axS = plt.axes([0.25, 0.1, 0.65, 0.03]) # Alpha slider
-        axS2 = plt.axes([0.25, 0.03, 0.65, 0.03]) # Wavelength slider
-        self.S = Slider(axS, 'alpha', 0, len(self.alphas), valinit=0, valfmt='%0.0f')
-        self.S2 = Slider(axS2, 'Wavelength', 0, len(self.wls), valinit=0, valfmt='%0.0f')
+        axS2 = plt.axes([0.25, 0.015, 0.65, 0.03]) # Wavelength slider
+        #if self.reg == 'elnet':
+        axS3 = plt.axes([0.25, 0.055, 0.65, 0.03])
+        self.S = Slider(axS, 'alpha', 0, len(self.alphas), valinit=0)
+        self.S.valtext.set_visible(False)
+        self.S2 = Slider(axS2, 'Wavelength', 0, len(self.wls), valinit=0)
+        self.S2.valtext.set_visible(False)
+        self.S3 = Slider(axS3, 'rho', 0, len(self.rhos), valinit=6)
+        self.S3.valtext.set_visible(False)
 
+        r = 6
+        a = 0
+        wl = 0
         def update(val):
-            n = int(self.S.val)
+            a = int(self.S.val)
+            wl = int(self.S2.val)
+            #if self.reg == 'elnet':
+            r = int(self.S3.val)
+
 	    ax.clear()
-            ax.set_title('Alpha = %f' % self.alphas[n])
-	    max_c = np.max(np.absolute(self.x_opts[:, :, n]))
-            if max_c > 0:
-                num_c = 20
-                C_pos = np.linspace(0, max_c, num_c)
-                C_neg = np.linspace(-max_c, 0, num_c, endpoint=False)
-                Contour_Levels = np.concatenate((C_neg, C_pos))
-            else:
-                Contour_Levels = None
-	    if self.reg == 'elnet':
-	    	C = ax.contourf(self.wls, self.taus, self.x_opts[:, :, n, 6], cmap=plt.cm.seismic, levels=Contour_Levels)
-	    else:
-	    	C = ax.contourf(self.wls, self.taus, self.x_opts[:, :, n], cmap=plt.cm.seismic, levels=Contour_Levels)
-	    if GA_taus != None:
-	        for i in range(len(GA_taus)):
-		    ax.axhline(GA_taus[i], linestyle='dashed', color='k')
-            plt.colorbar(C)
+            ax2.clear()
+            ax.set_title('Alpha = %f' % self.alphas[a])
             ax.set_ylabel(r'$\tau$', fontsize=14)
             ax.set_xlabel('Wavelength', fontsize=14)
 	    ax.set_yscale('log')
 
-            wl = int(self.S2.val)
-            ax2.clear()
             ax2.set_title('Wavelength = %f' % self.wls[wl])
-            ax2.plot(self.taus, self.x_opts[:,wl,n])
             ax2.set_xscale('log')
             ax2.set_xlabel(r'$\tau$', fontsize=14)
             ax2.set_ylabel('Amplitude', fontsize=14)
             ax2.yaxis.set_label_position('right')
             ax2.yaxis.tick_right()
             ax2.yaxis.label.set_rotation(270)
-            for i in range(len(Contour_Levels)):
-                ax2.axhline(Contour_Levels[i], linestyle='dashed', color='k')
-	    plt.draw()
+
+            if self.reg == 'elnet':
+                max_c = np.max(np.absolute(self.x_opts[:, :, a, r]))
+            else:
+                max_c = np.max(np.absolute(self.x_opts[:, :, a]))
+            if max_c > 0:
+                C_pos = np.linspace(0, max_c, num_c)
+                C_neg = np.linspace(-max_c, 0, num_c, endpoint=False)
+                Contour_Levels = np.concatenate((C_neg, C_pos))
+            else:
+                Contour_Levels = None
+
+	    if self.reg == 'elnet':
+	    	C = ax.contourf(self.wls, self.taus, self.x_opts[:, :, a, r], cmap=plt.cm.seismic, levels=Contour_Levels)
+                ax2.plot(self.taus, self.x_opts[:, wl, a, r])
+	    else:
+	    	C = ax.contourf(self.wls, self.taus, self.x_opts[:, :, a], cmap=plt.cm.seismic, levels=Contour_Levels)
+                ax2.plot(self.taus, self.x_opts[:, wl, a])
+            plt.colorbar(C)
+
+	    if GA_taus != None:
+	        for i in range(len(GA_taus)):
+		    ax.axhline(GA_taus[i], linestyle='dashed', color='k')
+
+            if len(Contour_Levels) > 1:
+                for i in range(len(Contour_Levels)):
+                    ax2.axhline(Contour_Levels[i], linestyle='dashed', color='k')
+
+            plt.draw()
+
         self.S.on_changed(update)
         self.S2.on_changed(update)
+        #if self.reg == 'elnet':
+        self.S3.on_changed(update)
 	plt.draw()
