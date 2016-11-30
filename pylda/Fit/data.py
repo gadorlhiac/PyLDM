@@ -92,22 +92,10 @@ class Data(object):
         self.lamnot = lamnot
 
     def fitIRF(self):
-	#self.fig_irf_fitting = plt.figure()
-	#self.fig_irf_fitting.canvas.set_window_title('Fitting IRF')
-	#d = plt.contourf(self.wls, self.times[self.izero-20:self.izero+20], self.data[self.izero-20:self.izero+20, :])
-	#p0 = np.array(plt.ginput(12))
-	#x = p0[:, 0]
-	#y = p0[:, 1]
-	#mui = 1
-	#popt = curve_fit(self._chirp_min, x, y, (self.munot, mui, self.lamnot))
-	#print popt
         pass
 
-    def _chirp_min(self, x, munot, mui, lamnot):
-	s = munot
-	#for i in range(self.irforder):
-	s += mui*((x - lamnot)/100)
-	return s
+    def _get_fit_func(self, x, order, mu_0, mu_i, lam_c):
+        pass
 
     def get_SVD(self):
 	return self.U, self.S, self.Vt

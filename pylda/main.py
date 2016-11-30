@@ -22,7 +22,6 @@ import matplotlib
 matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 import Tkinter as tk
 import re
 from tkFileDialog import askopenfilename
