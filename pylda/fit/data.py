@@ -22,7 +22,6 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy.linalg import *
-from scipy.optimize import curve_fit
 
 class Data(object):
     def __init__(self, f_in):
@@ -111,8 +110,6 @@ class Data(object):
 
     def get_data(self):
 	return self.data_work
-
-
 
     def set_GA_taus(self, taus):
 	pass

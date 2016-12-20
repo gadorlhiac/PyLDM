@@ -72,10 +72,12 @@ class SVD_GA(object):
             for j in range(len(D[i])):
                 t = T[i]
                 tau = taus[j]
-                #One = 0.5*(exp(-t/tau)*exp((self.munot + (self.FWHM_mod**2/(2*tau)))/tau))
-                #Two = 1 + erf((t-(self.munot+(self.FWHM_mod**2/tau)))/(sqrt(2)*self.FWHM_mod))
-                #D[i, j] = One*Two
-                D[i, j] = exp(-t/tau)
+                if self.FWHM_mod != 0:
+                    One = 0.5*(exp(-t/tau)*exp((self.munot + (self.FWHM_mod**2/(2*tau)))/tau))
+                    Two = 1 + erf((t-(self.munot+(self.FWHM_mod**2/tau)))/(sqrt(2)*self.FWHM_mod))
+                    D[i, j] = One*Two
+                else:
+                    D[i, j] = exp(-t/tau)
         return D
 
     def _getDAS(self, D, Y, alpha):
