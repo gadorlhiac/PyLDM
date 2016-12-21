@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from ..Fit.data import Data
+from fit.data import Data
 
 """
 These tests are to verify that data is loaded properly and simple manipulations are performed correctly.
@@ -9,7 +9,7 @@ These tests are to verify that data is loaded properly and simple manipulations 
 class TestData(unittest.TestCase):
     def setUp(self):
         print("in setUp()")
-        self.D = Data("Data/fulldata_noise10.csv")
+        self.D = Data("data/fulldata_noise10.csv")
         self.D.updateBounds(11, 50, 1, 40) #Define bounds of working data set (wl0, wl1, t0, t1)
 
     def tearDown(self):

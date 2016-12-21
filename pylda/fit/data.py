@@ -43,7 +43,11 @@ class Data(object):
  	self.times = np.array(self.times)
     	self.wls = np.array(self.wls)
 
-	self.izero = np.where(self.times==0)[0]
+        if 0 in self.times:
+            self.izero = np.where(self.times==0)[0]
+        else:
+            print("Data set does not contain 0 time point. Setting start time to first positive time point.")
+            self.izero = np.where(self.times > 0)[0][0]
 	self.wls_work = self.wls
 	self.data_work = self.data[self.izero:,:]
 	self.times_work = self.times[self.izero:]
