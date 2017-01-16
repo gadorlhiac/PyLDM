@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 """
-    PyLDA - Lifetime Density Analysis
+    PyLDM - Lifetime Density Analysis
     Copyright (C) 2016 Gabriel Dorlhiac, Clyde Fare
 
     This program is free software: you can redistribute it and/or modify
@@ -42,7 +42,7 @@ class SVD_GA(object):
         self.wLSV = self.U.dot(self.S)
         self.T = data.get_T()
 	self.wls = data.get_wls()
-	self.irforder, self.FWHM, self.munot, self.lamnot = data.get_IRF()
+	self.irforder, self.FWHM, self.mu, self.lamnot = data.get_IRF()
         self.FWHM_mod = self.FWHM/(2*sqrt(log(2)))
 
     def display(self):
@@ -73,14 +73,14 @@ class SVD_GA(object):
                 t = T[i]
                 tau = taus[j]
                 if self.FWHM_mod != 0:
-                    One = 0.5*(exp(-t/tau)*exp((self.munot + (self.FWHM_mod**2/(2*tau)))/tau))
-                    Two = 1 + erf((t-(self.munot+(self.FWHM_mod**2/tau)))/(sqrt(2)*self.FWHM_mod))
+                    One = 0.5*(exp(-t/tau)*exp((self.mu + (self.FWHM_mod**2/(2*tau)))/tau))
+                    Two = 1 + erf((t-(self.mu+(self.FWHM_mod**2/tau)))/(sqrt(2)*self.FWHM_mod))
                     D[i, j] = One*Two
                 else:
                     D[i, j] = exp(-t/tau)
         return D
 
-    def _getDAS(self, D, Y, alpha):
+    def _getDAS(self, D, Y, alpha=0):
 	if alpha != 0:
 	    D_aug = np.concatenate((D, alpha**(0.5)*np.identity(len(D[0]))))
 	    Y_aug = np.concatenate((Y, np.zeros([len(D[0]), len(Y[0])])))
@@ -90,8 +90,8 @@ class SVD_GA(object):
         Q, R = np.linalg.qr(D_aug)
         Qt = np.transpose(Q)
         DAS = np.zeros([len(D_aug[0]),len(Y_aug[0])])
-        QtY = Qt.dot(Y_aug)
-        
+        QtY = Qt.dot(Y)
+
         DAS[-1, :] = QtY[-1, :]/R[-1, -1]
         for i in range(len(DAS)-2, -1, -1):
             s = 0
@@ -107,12 +107,11 @@ class SVD_GA(object):
         return res
 
     def _GA(self, x0, Y, T, alpha, B):
-        #result = differential_evolution(self._min, bounds=B, args=(Y, T, alpha), tol=0.00001, popsize=100, polish=True))
 	result = minimize(self._min, x0, args=(Y, T, alpha), bounds=B)
         taus = result.x
         D = self._genD(taus, T)
         DAS = self._getDAS(D, Y, alpha)
-	print taus
+	print (taus)
         return taus, DAS, D.dot(DAS)
 
     def Global(self, wLSVs, x0, B, alpha):

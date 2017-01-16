@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-    PyLDA - Lifetime Density Analysis
+    PyLDM - Lifetime Density Analysis
     Copyright (C) 2016 Gabriel Dorlhiac, Clyde Fare
 
     This program is free software: you can redistribute it and/or modify
@@ -92,6 +92,7 @@ class Data(object):
         self.irforder = order
         self.FWHM = fwhm
         self.munot = munot
+        self.mu = self.munot
         self.lamnot = lamnot
 
     def fitIRF(self):
@@ -104,7 +105,7 @@ class Data(object):
 	return self.U, self.S, self.Vt
 
     def get_IRF(self):
-	return self.irforder, self.FWHM, self.munot, self.lamnot
+	return self.irforder, self.FWHM, self.mu, self.lamnot
 
     def get_T(self):
 	return self.times_work

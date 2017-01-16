@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-    PyLDA - Lifetime Density Analysis
+    PyLDM - Lifetime Density Analysis
     Copyright (C) 2016 Gabriel Dorlhiac, Clyde Fare
 
     This program is free software: you can redistribute it and/or modify
@@ -70,7 +70,7 @@ class LDA(object):
 	self.A = data.get_data()
 	self.times = data.get_T()
 	self.wls = data.get_wls()
-	self.irforder, self.FWHM, self.munot, self.lamnot = data.get_IRF()
+	self.irforder, self.FWHM, self.mu, self.lamnot = data.get_IRF()
         self.FWHM_mod = self.FWHM/(2*sqrt(log(2)))
 	self.genD()
 
@@ -92,8 +92,8 @@ class LDA(object):
                 t = self.times[i]
                 tau = self.taus[j]
                 if self.FWHM_mod != 0:
-                    One = 0.5*(exp(-t/tau)*exp((self.munot + (self.FWHM_mod**2/(2*tau)))/tau))
-                    Two = 1 + erf((t-(self.munot+(self.FWHM_mod**2/tau)))/(sqrt(2)*self.FWHM_mod))
+                    One = 0.5*(exp(-t/tau)*exp((self.mu + (self.FWHM_mod**2/(2*tau)))/tau))
+                    Two = 1 + erf((t-(self.mu+(self.FWHM_mod**2/tau)))/(sqrt(2)*self.FWHM_mod))
                     D[i, j] = One*Two
                 else:
                     D[i, j] = exp(-t/tau)

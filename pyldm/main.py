@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """    
-    PyLDA - Lifetime Density Analysis
+    PyLDM - Lifetime Density Analysis
     Copyright (C) 2016 Gabriel Dorlhiac, Clyde Fare
 
     This program is free software: you can redistribute it and/or modify
