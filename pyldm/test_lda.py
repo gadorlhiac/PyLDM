@@ -6,7 +6,7 @@ from fit.lda import LDA
 class TestLDA(unittest.TestCase):
     ##################################################################
     # Except where otherwise noted, the data loaded from the test    #
-    # matrix is used as the decay matrix instead of the data matrix. #
+    # matrix IS USED AS THE DECAY MATRIX instead of the data matrix. #
     # This is to simplify computations during for the purpose of     #
     # testing.                                                       #
     ##################################################################
@@ -15,10 +15,10 @@ class TestLDA(unittest.TestCase):
         self.data = Data("data/test_mat.csv")
         self.data.updateIRF(0, 0, 0, 0)
         self.lda = LDA(self.data)
-        self.U = np.array([[-1, 0, 0, 0], [0, 0, 1, 0], [0, -1, 0, 0], [0, 0, 0, 1]])
-        self.S = np.diag([5, 4, 3, 2])
-        self.Vt = np.array([[0, 0, 1, 0], [0, -1, 0, 0], [-1, 0, 0, 0], [0, 0, 0, 1]])
-        self.taus = np.array([0.5, 1, 2, 4])
+        self.U = np.array([[-1., 0, 0, 0], [0, 0, 1., 0], [0, -1., 0, 0], [0, 0, 0, 1.]])
+        self.S = np.diag([5., 4., 3., 2.])
+        self.Vt = np.array([[0, 0, 1., 0], [0, -1., 0, 0], [-1., 0, 0, 0], [0, 0, 0, 1.]])
+        self.taus = np.array([0.5, 1., 2., 4.])
         self.alphas = np.array([0, 1])
 
 
@@ -161,6 +161,81 @@ class TestLDA(unittest.TestCase):
         S_sol = np.array([[9./10., 0, 0, 0], [0, 16./17., 0, 0], [0, 0, 25./26., 0], [0, 0, 0, 4./5.]])
         self.assertAlmostEqual(S[1, 2], S_sol[1, 2], delta=1e-8)
 
+    def test_calc_k(self):
+        print("In test_calc_k()")
+        self.lda.alphas = np.linspace(-10, 10, 101)
+        x = np.linspace(-10, 10, 101)
+        y = x**2 + 5
+        k = self.lda._calc_k(x, y)
+        # Max curvature for the parabola should be at the inflection point.
+        self.assertEqual(k.argmax(), 50)
 
+    def test_L1_min(self):
+        print("In test_L1_min()")
+        self.lda.x_opts[:, :, 0] = np.array([[100, 10, 3, .1], [3, 1, 34, -10], [.5, 31, -4, 2], [10, 21, -5, 1]])
+        x = self.lda._L1_min(self.U, self.D, 0)
+        # Should be similar to ordinary least squares solution because using orthogonal matrix
+        soln = np.transpose(self.U).dot(self.D)
+        self.assertAlmostEqual(x[1, 1], soln[1, 1], delta=1e-8)
+
+    def test_L1_min2(self):
+        print("In test_L1_min2()")
+        self.lda.x_opts[:, :, 0] = np.array([[100, 10, 3, .1], [3, 1, 34, -10], [.5, 31, -4, 2], [10, 21, -5, 1]])
+        x = self.lda._L1_min(self.U, self.D, 0)
+        # Should be similar to ordinary least squares solution because using orthogonal matrix
+        soln = np.transpose(self.U).dot(self.D)
+        self.assertAlmostEqual(x[2, 3], soln[2, 3], delta=1e-8)
+
+    def test_L1_min3(self):
+        print("In test_L1_min3()")
+        self.lda.x_opts[:, :, 0] = np.array([[100, 10, 3, .1], [3, 1, 34, -10], [.5, 31, -4, 2], [10, 21, -5, 1]])
+        x = self.lda._L1_min(self.U, self.D, 100)
+        # Should be zero because of high alpha value
+        soln = np.zeros([4, 4])
+        self.assertEqual(x[3, 0], soln[3, 0])
+
+    def test_L1_min4(self):
+        print("In test_L1_min4()")
+        self.lda.x_opts[:, :, 0] = np.array([[100, 10, 3, .1], [3, 1, 34, -10], [.5, 31, -4, 2], [10, 21, -5, 1]])
+        x = self.lda._L1_min(self.U, self.D, 100)
+        # Should be zero because of high alpha value
+        soln = np.zeros([4, 4])
+        self.assertEqual(x[2, 2], soln[2, 2])
+
+    def test_elnet(self):
+        pass
+        # Makes use of same function as LASSO
+        #print("In test_elnet()")
+
+    def test_tsvdInv(self):
+        print("In test_tsvdInv()")
+        A = self.lda.A
+        self.lda.A = self.D
+        self.lda.D = A
+        S = np.diag([1./5., 1./4., 0, 0])
+        soln = np.transpose(self.Vt).dot(S).dot(np.transpose(self.U))
+        D_plus = self.lda._tsvdInv(2)
+        self.assertEqual(D_plus[3, 0], soln[3, 0])
+
+    def test_tsvd(self):
+        print("In test_tsvd()")
+        A = self.lda.A
+        self.lda.A = self.D
+        self.lda.D = A
+        S = np.diag([1./5., 1./4., 0, 0])
+        soln = np.transpose(self.Vt).dot(S).dot(np.transpose(self.U)).dot(self.D)
+        x = self.lda._tsvd(2)
+        self.assertEqual(x[1, 3], soln[1, 3])
+
+    def test_tsvd2(self):
+        print("In test_tsvd2()")
+        A = self.lda.A
+        self.lda.A = self.D
+        self.lda.D = A
+        S = np.diag([1./5., 1./4., 0, 0])
+        soln = np.transpose(self.Vt).dot(S).dot(np.transpose(self.U)).dot(self.D)
+        x = self.lda._tsvd(2)
+        self.assertEqual(x[0, 0], soln[0, 0])
+        
 if __name__ == '__main__':
     unittest.main()

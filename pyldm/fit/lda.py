@@ -138,10 +138,9 @@ class LDA(object):
         return x_opt
 
     def _calc_H_and_S(self, alpha):
-        X = np.transpose(self.D).dot(self.D) + self.alphas[alpha]*np.transpose(self.L).dot(self.L)
+        X = np.transpose(self.D).dot(self.D) + alpha*np.transpose(self.L).dot(self.L)
         U, S, Vt = np.linalg.svd(X, full_matrices=False)
         Xinv = np.transpose(Vt).dot(np.diag(1/S)).dot(np.transpose(U))
-        print Xinv
         H = self.D.dot(Xinv).dot(np.transpose(self.D))
         S = Xinv.dot(np.transpose(self.D).dot(self.D))
         return H, S
@@ -240,7 +239,7 @@ class LDA(object):
         for j in range(len(x[0])):
             for i in range(len(x)):
                 cond = np.array([1])
-                while cond > 10e-128 and x[i, j] != 0: # Can change tolerance here
+                while cond > 1e-128 and x[i, j] != 0: # Can change tolerance here
                     x_old = x
                     U = Dt.dot(A[:,j]) + B.dot(x_old[:,j])
                     sgn = np.sign(U[i])
