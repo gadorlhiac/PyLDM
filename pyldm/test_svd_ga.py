@@ -17,7 +17,7 @@ class TestSVD_GA(unittest.TestCase):
         self.U = np.array([[-1, 0, 0, 0], [0, 0, 1, 0], [0, -1, 0, 0], [0, 0, 0, 1]])
         self.S = np.diag([5, 4, 3, 2])
         self.Vt = np.array([[0, 0, 1, 0], [0, -1, 0, 0], [-1, 0, 0, 0], [0, 0, 0, 1]])
-        self.taus = np.array([0.5, 1, 2, 4])
+        self.taus = np.array([0.5, 1, 2, 4]) # Defined (not solved for) lifetimes for test cases
         self.D = np.array([[1, 1, 1, 1], [1./64., 1./8., 2**(0.5)/4., 2**(0.25)/2.],
                            [1./256., 1./16., 1./4., 1./2.], [1./1024., 1./32., 2**(0.5)/8., 8**(0.25)/4]])
         self.wLSVs = self.U.dot(self.S)
@@ -145,6 +145,28 @@ class TestSVD_GA(unittest.TestCase):
         I = np.identity(4)
         res = self.svd_ga._min(self.taus, self.wLSVs, self.data.get_T(), 0)
         self.assertAlmostEqual(res, 0, delta=1e-8)
+
+    def test_GA(self):
+        print("in test_GA()")
+        # Not tested as the only new feature is the scipy minimize function which
+        # has been extensively tested.
+
+    def test_get_wLSVs_for_fit(self):
+        print("in test_get_wLSVs_for_fit()")
+        indices, wLSVs = self.svd_ga._get_wLSVs_for_fit("1")
+        self.assertEqual(wLSVs[1], self.wLSVs[1, 0])
+
+    def test_get_wLSVs_for_fit2(self):
+        print("in test_get_wLSVs_for_fit2()")
+        indices, wLSVs = self.svd_ga._get_wLSVs_for_fit("1 2")
+        self.assertEqual(wLSVs[1, 1], self.wLSVs[1, 1])
+
+    def test_get_wLSVs_for_fit3(self):
+        print("in test_get_wLSVs_for_fit3()")
+        indices, wLSVs = self.svd_ga._get_wLSVs_for_fit("1 2 4")
+        self.assertEqual(indices[-1], 4)
+
+
 
 if __name__ == '__main__':
     unittest.main()

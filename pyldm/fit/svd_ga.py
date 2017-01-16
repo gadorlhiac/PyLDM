@@ -115,20 +115,23 @@ class SVD_GA(object):
         return taus, DAS, D.dot(DAS)
 
     def Global(self, wLSVs, x0, B, alpha):
-	wLSVs = map(int, wLSVs.split(' '))
-	if wLSVs == None:
-	    wLSV_fit = self.wLSV[:, :len(B)]
-	elif len(wLSVs) == 1:
-	    wLSV_fit = self.wLSV[:, :wLSVs[0]]
-	else:
-	    wLSV_fit = np.zeros([len(self.T), len(wLSVs)])
-	    for j in range(len(wLSVs)):
-		wLSV_fit[:, j] = self.wLSV[:, wLSVs[j]-1]
-
+        wLSV_indices, wLSV_fit = self._get_wLSVs_for_fit(wLSV_indices)
 	taus, DAS, SpecFit = self._GA(x0, wLSV_fit, self.T, alpha, B)
-	self._plot_res(wLSV_fit, wLSVs, taus, DAS, SpecFit, self.T)
+	self._plot_res(wLSV_fit, wLSV_indices, taus, DAS, SpecFit, self.T)
 	return taus
 
+    def _get_wLSVs_for_fit(self, wLSV_indices):
+        wLSV_indices = map(int, wLSV_indices.split(' '))
+        if wLSV_indices == None:
+	    wLSV_fit = self.wLSV[:, :len(B)]
+	elif len(wLSV_indices) == 1:
+	    wLSV_fit = self.wLSV[:, :wLSV_indices[0]]
+	else:
+	    wLSV_fit = np.zeros([len(self.T), len(wLSV_indices)])
+	    for j in range(len(wLSV_indices)):
+		wLSV_fit[:, j] = self.wLSV[:, wLSV_indices[j]-1]
+        return wLSV_indices, wLSV_fit
+        
     def _plot_res(self, wLSV_fit, wLSVs, taus, DAS, SpecFit, T):
 	if len(wLSVs) == 1:
 	    wLSVs = range(1, wLSVs[0]+1)

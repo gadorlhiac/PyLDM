@@ -114,24 +114,37 @@ class LDA(object):
             Cps = np.zeros([len(self.wls), len(self.alphas)])
 
 	for alpha in range(len(self.alphas)):
-            D_aug = np.concatenate((self.D, self.alphas[alpha]**(0.5)*self.L))
-            A_aug = np.concatenate((self.A, np.zeros([len(self.L), len(self.wls)])))
-	    U, S, Vt = np.linalg.svd(D_aug, full_matrices=False)
-	    V = np.transpose(Vt)
-	    Ut = np.transpose(U)
-	    Sinv = np.diag(1/S)
-	    self.x_opts[:, :, alpha] = V.dot(Sinv).dot(Ut).dot(A_aug)
-            X = np.transpose(self.D).dot(self.D) + self.alphas[alpha]*np.transpose(self.L).dot(self.L)
-            U, S, Vt = np.linalg.svd(X, full_matrices=False)
-            Xinv = np.transpose(Vt).dot(np.diag(1/S)).dot(np.transpose(U))
-            H = self.D.dot(Xinv).dot(np.transpose(self.D))
-            S = Xinv.dot(np.transpose(self.D).dot(self.D))
+	    self.x_opts[:, :, alpha] = self._solve_L2(self.alphas[alpha])
+            H, S = self._calc_H_and_S(self.alphas[alpha])
             if alpha == 0:
                 n = len(self.times)
                 self.var = sum((self.D.dot(self.x_opts[:, :, 0])-self.A)**2)/n
 	    GCVs[alpha] = self._calc_GCV(alpha, H)
             Cps[alpha] = self._calc_Cp(alpha, S)
 	return GCVs, Cps
+
+    def _solve_L2(self, alpha):
+        if alpha != 0:
+            A_aug = np.concatenate((self.A, np.zeros([len(self.L), len(self.wls)])))
+            D_aug = np.concatenate((self.D, alpha**(0.5)*self.L))
+        else:
+            A_aug = self.A
+            D_aug = self.D
+        U, S, Vt = np.linalg.svd(D_aug, full_matrices=False)
+        V = np.transpose(Vt)
+        Ut = np.transpose(U)
+        Sinv = np.diag(1/S)
+        x_opt = V.dot(Sinv).dot(Ut).dot(A_aug)
+        return x_opt
+
+    def _calc_H_and_S(self, alpha):
+        X = np.transpose(self.D).dot(self.D) + self.alphas[alpha]*np.transpose(self.L).dot(self.L)
+        U, S, Vt = np.linalg.svd(X, full_matrices=False)
+        Xinv = np.transpose(Vt).dot(np.diag(1/S)).dot(np.transpose(U))
+        print Xinv
+        H = self.D.dot(Xinv).dot(np.transpose(self.D))
+        S = Xinv.dot(np.transpose(self.D).dot(self.D))
+        return H, S
 
     # Calculates GCV
     def _calc_GCV(self, alpha, H):
