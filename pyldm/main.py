@@ -25,9 +25,9 @@ import matplotlib.pyplot as plt
 import Tkinter as tk
 import re
 from tkFileDialog import askopenfilename
-from Fit.lda import *
-from Fit.svd_ga import *
-from Fit.data import *
+from fit.lda import *
+from fit.svd_ga import *
+from fit.data import *
 
 class Main(tk.Frame):
     def __init__(self, master=None):
