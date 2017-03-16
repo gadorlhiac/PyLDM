@@ -368,14 +368,7 @@ class Main(tk.Frame):
 	plt.close()
 
     def svd_GA(self):
-	plt.close()
-	bounds = self.svdBounds.get()
-	if bounds != '':
-	    bounds = [(float(re.split('[( \s )]', x)[1]), float(re.split('[( \s )]', x)[2])) for x in bounds.split(',')]
-	else:
-	    bounds = None
-	x0 = map(float, self.svdInit.get().split())
-	print x0[0]
+	x0, bounds = self.getGAparams()
         self.GA_taus = self.SVD.Global(self.svdwLSVs.get(), x0, bounds, float(self.svdAlphavar.get()))
 	plt.show()
 	plt.close()
@@ -411,11 +404,74 @@ class Main(tk.Frame):
 	plt.close()
 
     def updateIRF(self):
-	self.data.updateIRF(int(self.irfordervar.get()), float(self.fwhmvar.get()), float(self.munotvar.get()), float(self.lamnotvar.get()))
+        order, fwhm, munot, mus, lamnot = self.getIRFparams()
+	self.data.updateIRF(order, fwhm, munot, mus, lamnot)
     
     def fitIRF(self):
-	self.data.updateIRF(int(self.irfordervar.get()), float(self.fwhmvar.get()), float(self.munotvar.get()), float(self.lamnotvar.get()))
-	self.data.fitIRF()
+        order, fwhm, munot, mus, lamnot = self.getIRFparams()
+	self.data.updateIRF(order, fwhm, munot, mus, lamnot)
+        #x0, bounds = self.getGAparams()
+        #self.GA_taus = self.SVD.Global(self.svdwLSVs.get(), x0, bounds, float(self.svdAlphavar.get()), fit_irf=True)
+	delay_shift = self.data.fitchirp()
+        order, fwhm, munot, mus, lamnot = self.data.get_IRF()
+        mus_str = ''
+        for i in range(len(mus)):
+            mus_str += str(mus[i]) + " "
+        self.fwhmvar.set(str(0.1))
+        self.munotvar.set("%s %s" % (str(munot), mus_str))
+        self.lamnotvar.set(str(lamnot))
+	self.LDAnalyzer.updateData(self.data)
+	self.SVD.updateData(self.data)
+        self.data.plot_chirp(delay_shift)
+        plt.show()
+        plt.close()
+
+    def getGAparams(self):
+        bounds = self.svdBounds.get()
+	if bounds != '':
+	    bounds = [(float(re.split('[( \s )]', x)[1]), float(re.split('[( \s )]', x)[2])) for x in bounds.split(',')]
+	else:
+	    bounds = None
+	x0 = map(float, self.svdInit.get().split())
+        if not x0:
+            x0 = [10, 50, 100]
+        if bounds != None and len(bounds) > len(x0):
+            n = len(x0)
+            bounds = bounds[:n]
+        elif bounds != None and len(bounds) < len(x0):
+            for i in range(len(x0)-len(bounds)):
+                bounds.append((0, 10000))
+        elif bounds == None:
+            bounds = []
+            for i in range(len(x0)):
+                bounds.append((0, 10000))
+        return x0, bounds
+    
+    def getIRFparams(self):
+        order = int(self.irfordervar.get())
+        fwhm = float(self.fwhmvar.get())
+        munot_and_mus = map(float, self.munotvar.get().split())
+        lamnot = float(self.lamnotvar.get())
+        if len(munot_and_mus) == 1:
+            munot = munot_and_mus[0]
+            mus = []
+            for i in range(order):
+                mus.append(0.1)
+        elif len(munot_and_mus) > 1:
+            munot = munot_and_mus[0]
+            mus = munot_and_mus[1:]
+            if len(mus) > order:
+                order = len(mus)
+            elif len(mus) < order:
+                dif = order - len(mus)
+                for i in range(dif):
+                    mus.append(0.1)
+        else:
+            munot = 1
+            mus = []
+            for i in range(order):
+                mus.append(0.1)
+        return order, fwhm, munot, mus, lamnot
 
     def getL(self, taus):
 	I = np.identity(len(taus))

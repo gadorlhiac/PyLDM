@@ -22,6 +22,9 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy.linalg import *
+from scipy.signal import gaussian
+from scipy.interpolate import interp2d
+from scipy.optimize import curve_fit
 
 class Data(object):
     def __init__(self, f_in):
@@ -70,7 +73,6 @@ class Data(object):
 		Sprime[j] = S[wLSVs[j]]
 	    Sprime = diag(Sprime)
 	    self.data = Uprime.dot(Sprime).dot(Vtprime)
-	    
     
     def display(self):
         self.fig_raw_data = plt.figure()
@@ -88,24 +90,95 @@ class Data(object):
 	self.data_work = self.data[t0:t, wl_lb:wl_ub]
 	self.U, self.S, self.Vt = np.linalg.svd(self.data_work, full_matrices=False)
 
-    def updateIRF(self, order, fwhm, munot, lamnot):
-        self.irforder = order
+    def updateIRF(self, order, fwhm, munot, mus, lamnot):
+        self.chirporder = order
         self.FWHM = fwhm
         self.munot = munot
-        self.mu = self.munot
+        self.mu = mus
         self.lamnot = lamnot
 
-    def fitIRF(self):
-        pass
+    def fitchirp(self):
+        f = interp2d(self.wls_work, self.times_work, self.data_work)
+        if self.times[-1] < 400:
+            n = 400
+        else:
+            n = self.times[-1]
+        time_interp = np.linspace(self.times[self.izero], self.times[-1], n)
+        spacing = time_interp[1]-time_interp[0]
+        data_interp = f(self.wls_work, time_interp)
+        sig = 0.1*spacing
+        IRF_norm = np.exp(-time_interp**2/(2*sig**2))*np.amax(np.absolute(data_interp))
+        delay_shift = np.zeros([len(self.wls_work)])
+        for j in range(len(self.wls_work)):
+            cor = np.correlate(data_interp[:, j], IRF_norm, "full")
+            delay_shift[j] = np.argmax(np.diff(np.absolute(cor)))
 
-    def _get_fit_func(self, x, order, mu_0, mu_i, lam_c):
-        pass
+        delay_shift -= np.amax([len(data_interp), len(IRF_norm)])
+        delay_shift += 1
+        delay_shift *= spacing
+
+        params = [self.munot, self.lamnot]
+        for i in range(self.chirporder):
+            params.append(self.mu[i])
+        if self.chirporder == 1:
+            p_opt, p_cov = curve_fit(self._fit_func1, self.wls_work, delay_shift, p0=params, maxfev=10000)
+        if self.chirporder == 2:
+            p_opt, p_cov = curve_fit(self._fit_func2, self.wls_work, delay_shift, p0=params, maxfev=10000)
+        if self.chirporder == 3:
+            p_opt, p_cov = curve_fit(self._fit_func3, self.wls_work, delay_shift, p0=params, maxfev=10000)
+        if self.chirporder == 4:
+            p_opt, p_cov = curve_fit(self._fit_func4, self.wls_work, delay_shift, p0=params, maxfev=10000)
+        if self.chirporder == 5:
+            p_opt, p_cov = curve_fit(self._fit_func5, self.wls_work, delay_shift, p0=params, maxfev=10000)
+        self.munot = p_opt[0]
+        self.lamnot = p_opt[1]
+        self.mu = p_opt[2:]
+        return delay_shift
+
+    def _fit_func1(self, wl, mu_0, lam_0, mu_i):
+        f = mu_0 + mu_i*((wl - lam_0)/100)
+        return f
+
+    def _fit_func2(self, wl, mu_0, lam_0, mu_i, mu_i2):
+        f = mu_0 + mu_i*((wl - lam_0)/100) + mu_i2*((wl - lam_0)/100)**2
+        return f
+
+    def _fit_func3(self, wl, mu_0, lam_0, mu_i, mu_i2, mu_i3):
+        f = mu_0 + mu_i*((wl - lam_0)/100) + mu_i2*((wl - lam_0)/100)**2 + mu_i3*((wl - lam_0)/100)**3
+        return f
+
+    def _fit_func4(self, wl, mu_0, lam_0, mu_i, mu_i2, mu_i3, mu_i4):
+        f = mu_0 + mu_i*((wl - lam_0)/100) + mu_i2*((wl - lam_0)/100)**2 + mu_i3*((wl - lam_0)/100)**2 + mu_i4*((wl - lam_0)/100)**4
+        return f
+
+    def _fit_func5(self, wl, mu_0, lam_0, mu_i, mu_i2, mu_i3, mu_i4, mu_i5):
+        f = mu_0 + mu_i*((wl - lam_0)/100) + mu_i2*((wl - lam_0)/100)**2 + mu_i3*((wl - lam_0)/100)**2 + mu_i4*((wl - lam_0)/100)**2 + mu_i5*((wl - lam_0)/100)**5
+        return f
+
+    def plot_chirp(self, delay_shift):
+        self.fig_chirp_fit = plt.figure()
+        self.fig_chirp_fit.canvas.set_window_title('Fit of Chirp to Autocorrelation')
+        if self.chirporder == 1:
+            chirp = self._fit_func1(self.wls_work, self.munot, self.lamnot, self.mu[0])
+        if self.chirporder == 2:
+            chirp = self._fit_func2(self.wls_work, self.munot, self.lamnot, self.mu[0], self.mu[1])
+        if self.chirporder == 3:
+            chirp = self._fit_func3(self.wls_work, self.munot, self.lamnot, self.mu[0], self.mu[1], self.mu[2])
+        if self.chirporder == 4:
+            chirp = self._fit_func4(self.wls_work, self.munot, self.lamnot, self.mu[0], self.mu[1], self.mu[2], self.mu[3])
+        if self.chirporder == 5:
+            chirp = self._fit_func5(self.wls_work, self.munot, self.lamnot, self.mu[0], self.mu[1], self.mu[2], self.mu[3], self.mu[4])
+        plt.plot(self.wls_work, delay_shift)
+        plt.plot(self.wls_work, chirp)
+        plt.draw()
+        plt.show()
+        plt.close()
 
     def get_SVD(self):
 	return self.U, self.S, self.Vt
 
     def get_IRF(self):
-	return self.irforder, self.FWHM, self.mu, self.lamnot
+	return self.chirporder, self.FWHM, self.munot, self.mu, self.lamnot
 
     def get_T(self):
 	return self.times_work

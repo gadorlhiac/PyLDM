@@ -22,5 +22,5 @@ from main import Main
 
 
 M = Main()
-M.master.title('PyLDA')
+M.master.title('PyLDM')
 M.mainloop()

@@ -70,8 +70,10 @@ class LDA(object):
 	self.A = data.get_data()
 	self.times = data.get_T()
 	self.wls = data.get_wls()
-	self.irforder, self.FWHM, self.mu, self.lamnot = data.get_IRF()
+	self.chirporder, self.FWHM, self.munot, self.mu, self.lamnot = data.get_IRF()
         self.FWHM_mod = self.FWHM/(2*sqrt(log(2)))
+        if self.FWHM != 0:
+            self.wl_mus = self._calc_mu()
 	self.genD()
 
     # Get matrix LDA parameters
@@ -84,6 +86,13 @@ class LDA(object):
 	self.genD()
         self.x_opts = np.zeros([len(self.taus), len(self.wls), len(self.alphas)])
 
+    # Calculate Wavelength Dependent mu for chirp correction
+    def _calc_mu(self):
+        mu = np.tile(self.munot, len(self.wls))
+        for i in range(len(self.mu)):
+            mu += self.mu[i]*((self.wls - self.lamnot))**(i+1)
+        return mu
+
     # Matrix of Exponential Decays
     def genD(self):
         D = np.zeros([len(self.times), len(self.taus)])
@@ -92,8 +101,8 @@ class LDA(object):
                 t = self.times[i]
                 tau = self.taus[j]
                 if self.FWHM_mod != 0:
-                    One = 0.5*(exp(-t/tau)*exp((self.mu + (self.FWHM_mod**2/(2*tau)))/tau))
-                    Two = 1 + erf((t-(self.mu+(self.FWHM_mod**2/tau)))/(sqrt(2)*self.FWHM_mod))
+                    One = 0.5*(exp(-t/tau)*exp((self.munot + (self.FWHM_mod**2/(2*tau)))/tau))
+                    Two = 1 + erf((t-(self.munot+(self.FWHM_mod**2/tau)))/(sqrt(2)*self.FWHM_mod))
                     D[i, j] = One*Two
                 else:
                     D[i, j] = exp(-t/tau)
@@ -125,11 +134,11 @@ class LDA(object):
 
     def _solve_L2(self, alpha):
         if alpha != 0:
-            A_aug = np.concatenate((self.A, np.zeros([len(self.L), len(self.wls)])))
             D_aug = np.concatenate((self.D, alpha**(0.5)*self.L))
+            A_aug = np.concatenate((self.A, np.zeros([len(self.L), len(self.wls)])))
         else:
-            A_aug = self.A
             D_aug = self.D
+            A_aug = self.A
         U, S, Vt = np.linalg.svd(D_aug, full_matrices=False)
         V = np.transpose(Vt)
         Ut = np.transpose(U)
@@ -216,11 +225,11 @@ class LDA(object):
 	else:
             Cps = np.zeros([len(self.wls), len(self.alphas)])
 
-	G,C = self._L2()
+	G,C = self._L2() # Throw away G, C, simply initialize x_opts to have a start guess that is the Tikhonov solution
 	for i in range(len(self.alphas)):
 	    alpha = self.alphas[i]
 	    self.x_opts[:, :, i] = self._L1_min(self.D, self.A, alpha)
-            Cps[i] = self._calc_L1_Cp(self.alphas[i])
+            Cps[i] = self._calc_L1_Cp(i)
         return Cps
 
     # Does the regularized least squares after converting to orthogonal design matrix
@@ -236,16 +245,16 @@ class LDA(object):
 	else:
 	    x = self.x_opts[:, :, 0]
 	cond = np.array([1])
-        for j in range(len(x[0])):
-            for i in range(len(x)):
+        for i in range(len(x)):
+            for j in range(len(x[0])):
                 cond = np.array([1])
-                while cond > 1e-128 and x[i, j] != 0: # Can change tolerance here
-                    x_old = x
-                    U = Dt.dot(A[:,j]) + B.dot(x_old[:,j])
+                while cond > 1e-12 and x[i, j] != 0: # Can change tolerance here
+                    x_old = np.copy(x)
+                    U = Dt.dot(A[:, j]) + B.dot(x_old[:, j])
                     sgn = np.sign(U[i])
                     absolute = np.absolute(U[i])
                     x_new = sgn*np.maximum((absolute-alpha)/g, 0)
-                    x[i, j] = np.real(x_new[0])
+                    x[i, j] = np.real(x_new)
                     cond = (x[i, j]-x_old[i, j])/x_old[i, j]
 	return x
 
@@ -404,53 +413,53 @@ class LDA(object):
     def _plot_LDM(self, GA_taus=None, num_c=10):
 	self.fig_ldm = plt.figure()
 	self.fig_ldm.canvas.set_window_title('LDM')
-	ax = self.fig_ldm.add_subplot(121)
+	self.ax = self.fig_ldm.add_subplot(121)
 	max_c = np.max(np.absolute(self.x_opts[:, :, 0]))
 	if max_c > 0:
 	    C_pos = np.linspace(0, max_c, num_c)
 	    C_neg = np.linspace(-max_c, 0, num_c, endpoint=False)
 	    Contour_Levels = np.concatenate((C_neg, C_pos))
 	else:
-	    Contour_Levels = None
+	    Contour_Levels = [0]
 	if self.reg == 'elnet':
-            C = ax.contourf(self.wls, self.taus, self.x_opts[:,:,0, 6], cmap=plt.cm.seismic, levels=Contour_Levels)
+            C = self.ax.contourf(self.wls, self.taus, self.x_opts[:,:,0, 6], cmap=plt.cm.seismic, levels=Contour_Levels)
 	else:
-            C = ax.contourf(self.wls, self.taus, self.x_opts[:,:,0], cmap=plt.cm.seismic, levels=Contour_Levels)
+            C = self.ax.contourf(self.wls, self.taus, self.x_opts[:,:,0], cmap=plt.cm.seismic, levels=Contour_Levels)
         plt.colorbar(C)
-	ax.set_yscale('log')
-        ax.set_ylabel(r'$\tau$', fontsize=14)
-        ax.set_xlabel('Wavelength', fontsize=14)
-        ax.set_title('Alpha = %f' % self.alphas[0])
+	self.ax.set_yscale('log')
+        self.ax.set_ylabel(r'$\tau$', fontsize=14)
+        self.ax.set_xlabel('Wavelength', fontsize=14)
+        self.ax.set_title('Alpha = %f' % self.alphas[0])
 	if GA_taus != None:
 	    for i in range(len(GA_taus)):
-		ax.axhline(GA_taus[i], linestyle='dashed', color='k')
-	ax2 = self.fig_ldm.add_subplot(122)
-        ax2.set_title('Wavelength = %f' % self.wls[0])
+		self.ax.axhline(GA_taus[i], linestyle='dashed', color='k')
+	self.ax2 = self.fig_ldm.add_subplot(122)
+        self.ax2.set_title('Wavelength = %f' % self.wls[0])
         if self.reg == 'elnet':
-            ax2.plot(self.taus, self.x_opts[:,0,0,6])
+            self.ax2.plot(self.taus, self.x_opts[:,0,0,6])
         else:
-            ax2.plot(self.taus, self.x_opts[:,0,0])
-        ax2.set_xscale('log')
-        ax2.set_xlabel(r'$\tau$', fontsize=14)
-        ax2.set_ylabel('Amplitude', fontsize=14)
-        ax2.yaxis.set_label_position('right')
-        ax2.yaxis.tick_right()
-        ax2.yaxis.label.set_rotation(270)
+            self.ax2.plot(self.taus, self.x_opts[:,0,0])
+        self.ax2.set_xscale('log')
+        self.ax2.set_xlabel(r'$\tau$', fontsize=14)
+        self.ax2.set_ylabel('Amplitude', fontsize=14)
+        self.ax2.yaxis.set_label_position('right')
+        self.ax2.yaxis.tick_right()
+        self.ax2.yaxis.label.set_rotation(270)
         if len(Contour_Levels) > 0:
             for i in range(len(Contour_Levels)):
-                ax2.axhline(Contour_Levels[i], linestyle='dashed', color='k')
+                self.ax2.axhline(Contour_Levels[i], linestyle='dashed', color='k')
 
 	plt.subplots_adjust(left=0.25, bottom=0.25)
-	axS = plt.axes([0.25, 0.1, 0.65, 0.03]) # Alpha slider
-        axS2 = plt.axes([0.25, 0.015, 0.65, 0.03]) # Wavelength slider
+	self.axS = plt.axes([0.25, 0.1, 0.65, 0.03]) # Alpha slider
+        self.axS2 = plt.axes([0.25, 0.015, 0.65, 0.03]) # Wavelength slider
         if self.reg == 'elnet':
-            axS3 = plt.axes([0.25, 0.055, 0.65, 0.03])
-        self.S = Slider(axS, 'alpha', 0, len(self.alphas), valinit=0)
+            self.axS3 = plt.axes([0.25, 0.055, 0.65, 0.03])
+        self.S = Slider(self.axS, 'alpha', 0, len(self.alphas), valinit=0)
         self.S.valtext.set_visible(False)
-        self.S2 = Slider(axS2, 'Wavelength', 0, len(self.wls), valinit=0)
+        self.S2 = Slider(self.axS2, 'Wavelength', 0, len(self.wls), valinit=0)
         self.S2.valtext.set_visible(False)
         if self.reg == 'elnet':
-            self.S3 = Slider(axS3, 'rho', 0, len(self.rhos), valinit=6)
+            self.S3 = Slider(self.axS3, 'rho', 0, len(self.rhos), valinit=6)
             self.S3.valtext.set_visible(False)
 
         r = 6
@@ -461,21 +470,25 @@ class LDA(object):
             wl = int(self.S2.val)
             if self.reg == 'elnet':
                 r = int(self.S3.val)
+                self.S3.valtext.set_visible(False)
 
-	    ax.clear()
-            ax2.clear()
-            ax.set_title('Alpha = %f' % self.alphas[a])
-            ax.set_ylabel(r'$\tau$', fontsize=16)
-            ax.set_xlabel('Wavelength', fontsize=16)
-	    ax.set_yscale('log')
+            self.S.valtext.set_visible(False)
+            self.S2.valtext.set_visible(False)
 
-            ax2.set_title('Wavelength = %f' % self.wls[wl])
-            ax2.set_xscale('log')
-            ax2.set_xlabel(r'$\tau$', fontsize=14)
-            ax2.set_ylabel('Amplitude', fontsize=14)
-            ax2.yaxis.set_label_position('right')
-            ax2.yaxis.tick_right()
-            ax2.yaxis.label.set_rotation(270)
+	    self.ax.clear()
+            self.ax2.clear()
+            self.ax.set_title('Alpha = %f' % self.alphas[a])
+            self.ax.set_ylabel(r'$\tau$', fontsize=16)
+            self.ax.set_xlabel('Wavelength', fontsize=16)
+	    self.ax.set_yscale('log')
+
+            self.ax2.set_title('Wavelength = %f' % self.wls[wl])
+            self.ax2.set_xscale('log')
+            self.ax2.set_xlabel(r'$\tau$', fontsize=14)
+            self.ax2.set_ylabel('Amplitude', fontsize=14)
+            self.ax2.yaxis.set_label_position('right')
+            self.ax2.yaxis.tick_right()
+            self.ax2.yaxis.label.set_rotation(270)
 
             if self.reg == 'elnet':
                 max_c = np.max(np.absolute(self.x_opts[:, :, a, r]))
@@ -489,25 +502,25 @@ class LDA(object):
                 Contour_Levels = None
 
 	    if self.reg == 'elnet':
-	    	C = ax.contourf(self.wls, self.taus, self.x_opts[:, :, a, r], cmap=plt.cm.seismic, levels=Contour_Levels)
-                ax2.plot(self.taus, self.x_opts[:, wl, a, r])
+	    	C = self.ax.contourf(self.wls, self.taus, self.x_opts[:, :, a, r], cmap=plt.cm.seismic, levels=Contour_Levels)
+                self.ax2.plot(self.taus, self.x_opts[:, wl, a, r])
 	    else:
-	    	C = ax.contourf(self.wls, self.taus, self.x_opts[:, :, a], cmap=plt.cm.seismic, levels=Contour_Levels)
-                ax2.plot(self.taus, self.x_opts[:, wl, a])
+	    	C = self.ax.contourf(self.wls, self.taus, self.x_opts[:, :, a], cmap=plt.cm.seismic, levels=Contour_Levels)
+                self.ax2.plot(self.taus, self.x_opts[:, wl, a])
             plt.colorbar(C)
 
 	    if GA_taus != None:
 	        for i in range(len(GA_taus)):
-		    ax.axhline(GA_taus[i], linestyle='dashed', color='k')
+		    self.ax.axhline(GA_taus[i], linestyle='dashed', color='k')
 
             if len(Contour_Levels) > 1:
                 for i in range(len(Contour_Levels)):
-                    ax2.axhline(Contour_Levels[i], linestyle='dashed', color='k')
-
-            plt.draw()
+                    self.ax2.axhline(Contour_Levels[i], linestyle='dashed', color='k')
+            self.fig_ldm.canvas.draw_idle()
+#            plt.draw()
 
         self.S.on_changed(update)
         self.S2.on_changed(update)
         if self.reg == 'elnet':
             self.S3.on_changed(update)
-	plt.draw()
+	plt.show()

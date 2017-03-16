@@ -1,6 +1,6 @@
 Metadata-Version: 1.0
 Name: PyLDM
-Version: 0.1
+Version: 0.12
 Summary: Python Based Lifetime Density Analysis of Time-Resolved Ultrafast Data
 Home-page: https://www.github.com/gadorlhiac/pyldm
 Author: Gabriel Dorlhiac, Clyde Fare

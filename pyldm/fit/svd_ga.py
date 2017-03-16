@@ -42,7 +42,7 @@ class SVD_GA(object):
         self.wLSV = self.U.dot(self.S)
         self.T = data.get_T()
 	self.wls = data.get_wls()
-	self.irforder, self.FWHM, self.mu, self.lamnot = data.get_IRF()
+	self.chirporder, self.FWHM, self.munot, self.mu, self.lamnot = data.get_IRF()
         self.FWHM_mod = self.FWHM/(2*sqrt(log(2)))
 
     def display(self):
@@ -66,70 +66,94 @@ class SVD_GA(object):
 	    plt.draw()
         self.S.on_changed(update)
 
-    def _genD(self, taus, T):
-        D = np.zeros([len(T), len(taus)])
+    def _genD(self, taus, T, fit_irf):
+        if fit_irf:
+            D = np.zeros([len(T), len(taus)-1])
+            fwhm = taus[-1]
+            fwhm_mod = fwhm/(2*sqrt(log(2)))
+        else:
+            D = np.zeros([len(T), len(taus)])
         for i in range(len(D)):
             for j in range(len(D[i])):
                 t = T[i]
                 tau = taus[j]
-                if self.FWHM_mod != 0:
-                    One = 0.5*(exp(-t/tau)*exp((self.mu + (self.FWHM_mod**2/(2*tau)))/tau))
-                    Two = 1 + erf((t-(self.mu+(self.FWHM_mod**2/tau)))/(sqrt(2)*self.FWHM_mod))
+                if fit_irf:
+                    One = 0.5*(exp(-t/tau)*exp(fwhm_mod**2/(2*tau))/tau)
+                    Two = 1 + erf((t-(fwhm_mod**2/tau))/(sqrt(2)*fwhm_mod))
                     D[i, j] = One*Two
                 else:
                     D[i, j] = exp(-t/tau)
         return D
 
     def _getDAS(self, D, Y, alpha=0):
-	if alpha != 0:
-	    D_aug = np.concatenate((D, alpha**(0.5)*np.identity(len(D[0]))))
-	    Y_aug = np.concatenate((Y, np.zeros([len(D[0]), len(Y[0])])))
-	else:
-	    D_aug = D
-	    Y_aug = Y
+        if alpha != 0:
+            D_aug = np.concatenate((D, alpha**(0.5)*np.identity(len(D[0]))))
+            Y_aug = np.concatenate((Y, np.zeros([len(D[0]), len(Y[0])])))
+        else:
+            D_aug = D
+            Y_aug = Y
         Q, R = np.linalg.qr(D_aug)
         Qt = np.transpose(Q)
         DAS = np.zeros([len(D_aug[0]),len(Y_aug[0])])
         QtY = Qt.dot(Y)
-
+            
         DAS[-1, :] = QtY[-1, :]/R[-1, -1]
         for i in range(len(DAS)-2, -1, -1):
             s = 0
             for k in range(i+1, len(DAS)):
                 s += R[i, k]*DAS[k, :]
-            DAS[i, :] = (QtY[i, :] - s)/R[i, i]
+                DAS[i, :] = (QtY[i, :] - s)/R[i, i]
         return DAS
 
-    def _min(self, taus, Y, T, alpha):
-        D = self._genD(taus, T)
+    def _min(self, taus, Y, T, alpha, fit_irf):
+        D = self._genD(taus, T, fit_irf)
         DAS = self._getDAS(D, Y, alpha)
         res = sum((Y - D.dot(DAS))**2)
         return res
 
-    def _GA(self, x0, Y, T, alpha, B):
-	result = minimize(self._min, x0, args=(Y, T, alpha), bounds=B)
+    def _GA(self, x0, Y, T, alpha, B, fit_irf):
+	result = minimize(self._min, x0, args=(Y, T, alpha, fit_irf), bounds=B)
         taus = result.x
-        D = self._genD(taus, T)
+        D = self._genD(taus, T, fit_irf)
         DAS = self._getDAS(D, Y, alpha)
 	print (taus)
         return taus, DAS, D.dot(DAS)
 
-    def Global(self, wLSVs, x0, B, alpha):
-        wLSV_indices, wLSV_fit = self._get_wLSVs_for_fit(wLSV_indices)
-	taus, DAS, SpecFit = self._GA(x0, wLSV_fit, self.T, alpha, B)
+    def Global(self, wLSVs, x0, B, alpha, fit_irf=False, fwhm=None):
+        wLSV_indices, wLSV_fit = self._get_wLSVs_for_fit(wLSVs, B)
+        if fit_irf:
+            if fwhm != None:
+                x0.append(fwhm)
+            else:
+                x0.append(0.1)
+            if len(B) == len(x0)-1:
+                B.append((0,1))
+	taus, DAS, SpecFit = self._GA(x0, wLSV_fit, self.T, alpha, B, fit_irf)
 	self._plot_res(wLSV_fit, wLSV_indices, taus, DAS, SpecFit, self.T)
+        if fit_irf:
+            fwhm = taus[-1]
+            return taus[:-1], fwhm
 	return taus
 
-    def _get_wLSVs_for_fit(self, wLSV_indices):
-        wLSV_indices = map(int, wLSV_indices.split(' '))
-        if wLSV_indices == None:
-	    wLSV_fit = self.wLSV[:, :len(B)]
-	elif len(wLSV_indices) == 1:
-	    wLSV_fit = self.wLSV[:, :wLSV_indices[0]]
-	else:
-	    wLSV_fit = np.zeros([len(self.T), len(wLSV_indices)])
-	    for j in range(len(wLSV_indices)):
-		wLSV_fit[:, j] = self.wLSV[:, wLSV_indices[j]-1]
+    def _get_wLSVs_for_fit(self, wLSV_indices, B):
+        wLSV_indices = wLSV_indices.split()
+        if wLSV_indices:
+            wLSV_indices = map(int, wLSV_indices)
+            print wLSV_indices
+            if wLSV_indices == None:
+                if B != None:
+                    wLSV_fit = self.wLSV[:, :len(B)]
+                else:
+                    wLSV_fit = self.wLSV[:, :3]
+            elif len(wLSV_indices) == 1:
+                wLSV_fit = self.wLSV[:, :wLSV_indices[0]]
+            else:
+                wLSV_fit = np.zeros([len(self.T), len(wLSV_indices)])
+                for j in range(len(wLSV_indices)):
+                    wLSV_fit[:, j] = self.wLSV[:, wLSV_indices[j]-1]
+        else:
+            wLSV_indices = [3]
+            wLSV_fit = self.wLSV[:, :wLSV_indices[0]]
         return wLSV_indices, wLSV_fit
         
     def _plot_res(self, wLSV_fit, wLSVs, taus, DAS, SpecFit, T):
