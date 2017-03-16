@@ -173,16 +173,16 @@ class SVD_GA(object):
         ax2.set_xscale('symlog', linthreshy=1)
         ax2.legend(loc=0, frameon=False)
 	axS = plt.axes([0.25, 0.1, 0.65, 0.03])
-        S = DiscreteSlider(axS, 'wLSV', 1, len(taus)+1, valinit=1, valfmt='%0.0f', increment=1)
+        self.S = DiscreteSlider(axS, 'wLSV', 1, len(taus)+1, valinit=1, valfmt='%0.0f', increment=1)
         def update(val):
-            n = int(S.val)
+            n = int(self.S.val)
 	    ax2.clear()
 	    ax2.plot(T, wLSV_fit[:,n-1], 'bo-', label='wLSV %d'%wLSVs[n-1])
 	    ax2.plot(T, SpecFit[:,n-1], 'r', label='Fit')
 	    ax2.set_xscale('symlog', linthreshy=1)
 	    ax2.legend(loc=0, frameon=False)
 	    plt.draw()
-        S.on_changed(update)
+        self.S.on_changed(update)
 	plt.draw()
 
         
