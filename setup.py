@@ -3,7 +3,7 @@ import setuptools
 from distutils.core import setup
 
 setup(name='PyLDM',
-      version='0.12',
+      version='0.15',
       description='Python Based Lifetime Density Analysis of Time-Resolved Ultrafast Data',
       author='Gabriel Dorlhiac, Clyde Fare',
       author_email='gadorlhiac@gmail.com',

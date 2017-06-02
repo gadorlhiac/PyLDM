@@ -101,8 +101,8 @@ class LDA(object):
                 t = self.times[i]
                 tau = self.taus[j]
                 if self.FWHM_mod != 0:
-                    One = 0.5*(exp(-t/tau)*exp((self.munot + (self.FWHM_mod**2/(2*tau)))/tau))
-                    Two = 1 + erf((t-(self.munot+(self.FWHM_mod**2/tau)))/(sqrt(2)*self.FWHM_mod))
+                    One = 0.5*(exp(-t/tau)*exp(self.FWHM_mod**2/(2*tau))/tau)
+                    Two = 1 + erf((t-(self.FWHM_mod**2/tau))/(sqrt(2)*self.FWHM_mod))
                     D[i, j] = One*Two
                 else:
                     D[i, j] = exp(-t/tau)
@@ -232,6 +232,7 @@ class LDA(object):
             Cps[i] = self._calc_L1_Cp(i)
         return Cps
 
+    # Giving same result for first and last alpha ???
     # Does the regularized least squares after converting to orthogonal design matrix
     def _L1_min(self, D, A, alpha):
 	p = len(D[0])
@@ -248,7 +249,7 @@ class LDA(object):
         for i in range(len(x)):
             for j in range(len(x[0])):
                 cond = np.array([1])
-                while cond > 1e-12 and x[i, j] != 0: # Can change tolerance here
+                while cond > 1e-8 and x[i, j] != 0: # Can change tolerance here
                     x_old = np.copy(x)
                     U = Dt.dot(A[:, j]) + B.dot(x_old[:, j])
                     sgn = np.sign(U[i])
@@ -524,3 +525,4 @@ class LDA(object):
         if self.reg == 'elnet':
             self.S3.on_changed(update)
 	plt.show()
+

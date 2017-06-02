@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy.linalg import *
 from scipy.signal import gaussian
-from scipy.interpolate import interp2d
+from scipy.interpolate import interp1d,interp2d
 from scipy.optimize import curve_fit
 
 class Data(object):
@@ -43,6 +43,7 @@ class Data(object):
                     self.times.append(float(temp[0]))
                     self.data.append(list(map(float, temp[1:])))
 	self.data = np.array(self.data)
+        self.data_dechirped = np.copy(self.data)
  	self.times = np.array(self.times)
     	self.wls = np.array(self.wls)
 
@@ -51,9 +52,9 @@ class Data(object):
         else:
             print("Data set does not contain 0 time point. Setting start time to first positive time point.")
             self.izero = np.where(self.times > 0)[0][0]
-	self.wls_work = self.wls
-	self.data_work = self.data[self.izero:,:]
-	self.times_work = self.times[self.izero:]
+	self.wls_work = np.copy(self.wls)
+	self.data_work = np.copy(self.data_dechirped[self.izero:,:])
+	self.times_work = np.copy(self.times[self.izero:])
 	self.U, self.S, self.Vt = np.linalg.svd(self.data_work, full_matrices=False)
 
     def truncData(self, wLSVs):
@@ -77,7 +78,7 @@ class Data(object):
     def display(self):
         self.fig_raw_data = plt.figure()
         self.fig_raw_data.canvas.set_window_title('Raw Data')
-	d = plt.contourf(self.wls, self.times, self.data)
+	d = plt.contourf(self.wls_work, self.times_work, self.data_work)
         plt.yscale('symlog', linthreshy=1)
         plt.ylabel('Time')
         plt.xlabel('Wavelength')
@@ -85,9 +86,9 @@ class Data(object):
         plt.draw()
 
     def updateBounds(self, wl_lb, wl_ub, t0, t):
-	self.wls_work = self.wls[wl_lb:wl_ub]
-	self.times_work = self.times[t0:t]
-	self.data_work = self.data[t0:t, wl_lb:wl_ub]
+	self.wls_work = np.copy(self.wls[wl_lb:wl_ub])
+	self.times_work = np.copy(self.times[t0:t])
+	self.data_work = np.copy(self.data_dechirped[t0:t, wl_lb:wl_ub])
 	self.U, self.S, self.Vt = np.linalg.svd(self.data_work, full_matrices=False)
 
     def updateIRF(self, order, fwhm, munot, mus, lamnot):
@@ -98,14 +99,14 @@ class Data(object):
         self.lamnot = lamnot
 
     def fitchirp(self):
-        f = interp2d(self.wls_work, self.times_work, self.data_work)
+        f = interp2d(self.wls, self.times, self.data)
         if self.times[-1] < 400:
             n = 400
         else:
             n = self.times[-1]
-        time_interp = np.linspace(self.times[self.izero], self.times[-1], n)
+        time_interp = np.linspace(self.times[0], self.times[-1], 2*n)
         spacing = time_interp[1]-time_interp[0]
-        data_interp = f(self.wls_work, time_interp)
+        data_interp = f(self.wls, time_interp)
         sig = 0.1*spacing
         IRF_norm = np.exp(-time_interp**2/(2*sig**2))*np.amax(np.absolute(data_interp))
         delay_shift = np.zeros([len(self.wls_work)])
@@ -133,6 +134,7 @@ class Data(object):
         self.munot = p_opt[0]
         self.lamnot = p_opt[1]
         self.mu = p_opt[2:]
+        self._chirp_correct()
         return delay_shift
 
     def _fit_func1(self, wl, mu_0, lam_0, mu_i):
@@ -158,21 +160,31 @@ class Data(object):
     def plot_chirp(self, delay_shift):
         self.fig_chirp_fit = plt.figure()
         self.fig_chirp_fit.canvas.set_window_title('Fit of Chirp to Autocorrelation')
-        if self.chirporder == 1:
-            chirp = self._fit_func1(self.wls_work, self.munot, self.lamnot, self.mu[0])
-        if self.chirporder == 2:
-            chirp = self._fit_func2(self.wls_work, self.munot, self.lamnot, self.mu[0], self.mu[1])
-        if self.chirporder == 3:
-            chirp = self._fit_func3(self.wls_work, self.munot, self.lamnot, self.mu[0], self.mu[1], self.mu[2])
-        if self.chirporder == 4:
-            chirp = self._fit_func4(self.wls_work, self.munot, self.lamnot, self.mu[0], self.mu[1], self.mu[2], self.mu[3])
-        if self.chirporder == 5:
-            chirp = self._fit_func5(self.wls_work, self.munot, self.lamnot, self.mu[0], self.mu[1], self.mu[2], self.mu[3], self.mu[4])
+        chirp = self._get_chirp()
         plt.plot(self.wls_work, delay_shift)
         plt.plot(self.wls_work, chirp)
         plt.draw()
         plt.show()
-        plt.close()
+
+    def _chirp_correct(self):
+        chirp = self._get_chirp()
+        for i in range(len(self.wls)):
+            chirped_time = self.times - chirp[i]
+            f = interp1d(chirped_time, self.data[:,i], kind="linear", bounds_error=False, fill_value=(0,0))
+            self.data_dechirped[:,i] = f(self.times)
+
+    def _get_chirp(self):
+        if self.chirporder == 1:
+            chirp = self._fit_func1(self.wls, self.munot, self.lamnot, self.mu[0])
+        if self.chirporder == 2:
+            chirp = self._fit_func2(self.wls, self.munot, self.lamnot, self.mu[0], self.mu[1])
+        if self.chirporder == 3:
+            chirp = self._fit_func3(self.wls, self.munot, self.lamnot, self.mu[0], self.mu[1], self.mu[2])
+        if self.chirporder == 4:
+            chirp = self._fit_func4(self.wls, self.munot, self.lamnot, self.mu[0], self.mu[1], self.mu[2], self.mu[3])
+        if self.chirporder == 5:
+            chirp = self._fit_func5(self.wls, self.munot, self.lamnot, self.mu[0], self.mu[1], self.mu[2], self.mu[3], self.mu[4])
+        return chirp
 
     def get_SVD(self):
 	return self.U, self.S, self.Vt

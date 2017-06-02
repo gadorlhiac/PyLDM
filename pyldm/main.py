@@ -132,6 +132,8 @@ class Main(tk.Frame):
 	self.updateIRFButton.pack(side='top', anchor='w')
 	self.fitIRFButton = tk.Button(self.irfButtons, text='Fit IRF', command=self.fitIRF)
 	self.fitIRFButton.pack(side='top', anchor='w')
+        self.fitDispersionButton = tk.Button(self.irfButtons, text='Fit Dispersion', command=self.fitDispersion)
+        self.fitDispersionButton.pack(side='top', anchor='w')
 
     def ldaWidgets(self):
 	self.regvar = tk.StringVar()
@@ -347,7 +349,8 @@ class Main(tk.Frame):
         self.tmaxvar.set('-1')
         self.wl1var.set('0')
         self.wl2var.set('-1')
-        self.updateIRF()
+        order, fwhm, munot, mus, lamnot = self.getIRFparams()
+	self.data.updateIRF(order, fwhm, munot, mus, lamnot)
 	self.SVD = SVD_GA(self.data)
 	self.LDAnalyzer = LDA(self.data)
         self.data.display()
@@ -406,18 +409,35 @@ class Main(tk.Frame):
     def updateIRF(self):
         order, fwhm, munot, mus, lamnot = self.getIRFparams()
 	self.data.updateIRF(order, fwhm, munot, mus, lamnot)
+        self.data._chirp_correct()
+	self.LDAnalyzer.updateData(self.data)
+	self.SVD.updateData(self.data)
     
     def fitIRF(self):
         order, fwhm, munot, mus, lamnot = self.getIRFparams()
+        x0, bounds = self.getGAparams()
+        if fwhm == 0:
+            x0.append(.05)
+        else:
+            x0.append(fwhm)
+        if len(bounds) == (len(x0) - 1):
+            bounds.append((0.01, 2))
+        self.GA_taus, fwhm_fit = self.SVD.Global(self.svdwLSVs.get(), x0, bounds, float(self.svdAlphavar.get()), fit_irf=True)
+        self.fwhmvar.set(str(fwhm_fit))
+        self.data.updateIRF(order, fwhm_fit, munot, mus, lamnot)
+	self.LDAnalyzer.updateData(self.data)
+	self.SVD.updateData(self.data)
+        plt.show()
+        plt.close()
+
+    def fitDispersion(self):
+        order, fwhm, munot, mus, lamnot = self.getIRFparams()
 	self.data.updateIRF(order, fwhm, munot, mus, lamnot)
-        #x0, bounds = self.getGAparams()
-        #self.GA_taus = self.SVD.Global(self.svdwLSVs.get(), x0, bounds, float(self.svdAlphavar.get()), fit_irf=True)
 	delay_shift = self.data.fitchirp()
         order, fwhm, munot, mus, lamnot = self.data.get_IRF()
         mus_str = ''
         for i in range(len(mus)):
             mus_str += str(mus[i]) + " "
-        self.fwhmvar.set(str(0.1))
         self.munotvar.set("%s %s" % (str(munot), mus_str))
         self.lamnotvar.set(str(lamnot))
 	self.LDAnalyzer.updateData(self.data)
