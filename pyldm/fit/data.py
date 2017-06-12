@@ -53,8 +53,8 @@ class Data(object):
             print("Data set does not contain 0 time point. Setting start time to first positive time point.")
             self.izero = np.where(self.times > 0)[0][0]
 	self.wls_work = np.copy(self.wls)
-	self.data_work = np.copy(self.data_dechirped[self.izero:,:])
-	self.times_work = np.copy(self.times[self.izero:])
+	self.data_work = np.copy(self.data_dechirped[self.izero[0]:,:])
+	self.times_work = np.copy(self.times[self.izero[0]:])
 	self.U, self.S, self.Vt = np.linalg.svd(self.data_work, full_matrices=False)
 
     def truncData(self, wLSVs):
