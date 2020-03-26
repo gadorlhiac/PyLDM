@@ -29,41 +29,41 @@ from scipy.linalg import *
 from scipy.special import *
 from random import *
 from matplotlib.widgets import Slider
-from discreteslider import DiscreteSlider
+from .discreteslider import DiscreteSlider
 
 class SVD_GA(object):
     def __init__(self, data):
-	self.updateData(data)
+        self.updateData(data)
         
     def updateData(self, data):
         self.U, self.S, self.Vt = data.get_SVD()
-	self.Svals = self.S
+        self.Svals = self.S
         self.S = diag(self.S)
         self.wLSV = self.U.dot(self.S)
         self.T = data.get_T()
-	self.wls = data.get_wls()
-	self.chirporder, self.FWHM, self.munot, self.mu, self.lamnot = data.get_IRF()
+        self.wls = data.get_wls()
+        self.chirporder, self.FWHM, self.munot, self.mu, self.lamnot = data.get_IRF()
         self.FWHM_mod = self.FWHM/(2*sqrt(log(2)))
 
     def display(self):
         fig = plt.figure()
         fig.canvas.set_window_title('Singular Values')
-	ax = fig.add_subplot(121)
+        ax = fig.add_subplot(121)
         ax.plot(range(1,len(self.Svals)+1), self.Svals, 'o-')
-	ax2 = fig.add_subplot(122)
-	plt.subplots_adjust(left=0.25, bottom=0.25)
+        ax2 = fig.add_subplot(122)
+        plt.subplots_adjust(left=0.25, bottom=0.25)
         ax2.plot(self.T, self.wLSV[:,0], 'bo-', label='wLSV 1')
         plt.xscale('log')
         plt.legend(loc=0, frameon=False)
-	axS = plt.axes([0.25, 0.1, 0.65, 0.03])
+        axS = plt.axes([0.25, 0.1, 0.65, 0.03])
         self.S = Slider(axS, 'wLSV', 1, len(self.wLSV[0]), valinit=1, valfmt='%0.0f')
         def update(val):
             n = int(self.S.val)
-	    ax2.clear()
-	    ax2.plot(self.T, self.wLSV[:,n-1], 'bo-', label='wLSV %d'%n)
-	    ax2.set_xscale('log')
-	    ax2.legend(loc=0, frameon=False)
-	    plt.draw()
+            ax2.clear()
+            ax2.plot(self.T, self.wLSV[:,n-1], 'bo-', label='wLSV %d'%n)
+            ax2.set_xscale('log')
+            ax2.legend(loc=0, frameon=False)
+            plt.draw()
         self.S.on_changed(update)
 
     def _genD(self, taus, T, fit_irf):
@@ -117,28 +117,28 @@ class SVD_GA(object):
         return res
 
     def _GA(self, x0, Y, T, alpha, B, fit_irf):
-	result = minimize(self._min, x0, args=(Y, T, alpha, fit_irf), bounds=B)
+        result = minimize(self._min, x0, args=(Y, T, alpha, fit_irf), bounds=B)
         taus = result.x
         D = self._genD(taus, T, fit_irf)
         DAS = self._getDAS(D, Y, alpha)
-	print (taus)
+        print(taus)
         return taus, DAS, D.dot(DAS)
 
     def Global(self, wLSVs, x0, B, alpha, fit_irf=False, fwhm=None):
         wLSV_indices, wLSV_fit = self._get_wLSVs_for_fit(wLSVs, B)
-	taus, DAS, SpecFit = self._GA(x0, wLSV_fit, self.T, alpha, B, fit_irf)
+        taus, DAS, SpecFit = self._GA(x0, wLSV_fit, self.T, alpha, B, fit_irf)
         if fit_irf:
             self._plot_res(wLSV_fit, wLSV_indices, taus[:-1], DAS, SpecFit, self.T)
             fwhm = taus[-1]
             return taus[:-1], fwhm
-	self._plot_res(wLSV_fit, wLSV_indices, taus, DAS, SpecFit, self.T)
-	return taus
+        self._plot_res(wLSV_fit, wLSV_indices, taus, DAS, SpecFit, self.T)
+        return taus
 
     def _get_wLSVs_for_fit(self, wLSV_indices, B):
         wLSV_indices = wLSV_indices.split()
         if wLSV_indices: # List as condition returns true if not empty
-            wLSV_indices = map(int, wLSV_indices)
-            print wLSV_indices
+            wLSV_indices = list(map(int, wLSV_indices))
+            print(wLSV_indices)
             if wLSV_indices == None:
                 if B != None:
                     wLSV_fit = self.wLSV[:, :len(B)]
@@ -156,33 +156,30 @@ class SVD_GA(object):
         return wLSV_indices, wLSV_fit
         
     def _plot_res(self, wLSV_fit, wLSVs, taus, DAS, SpecFit, T):
-	if len(wLSVs) == 1:
-	    wLSVs = range(1, wLSVs[0]+1)
+        if len(wLSVs) == 1:
+            wLSVs = range(1, wLSVs[0]+1)
         fig = plt.figure()
-	fig.canvas.set_window_title('GA Fits')
-	plt.subplots_adjust(left=0.25, bottom=0.25)
-	ax = fig.add_subplot(121)
-	for i in range(len(DAS)):
-	    ax.plot(range(1, len(DAS[0])+1), DAS[i, :], label="%.3f"%taus[i])
-	ax.legend(loc=0, frameon=False)
+        fig.canvas.set_window_title('GA Fits')
+        plt.subplots_adjust(left=0.25, bottom=0.25)
+        ax = fig.add_subplot(121)
+        for i in range(len(DAS)):
+            ax.plot(range(1, len(DAS[0])+1), DAS[i, :], label="%.3f"%taus[i])
+        ax.legend(loc=0, frameon=False)
 
-	ax2 = fig.add_subplot(122)
+        ax2 = fig.add_subplot(122)
         ax2.plot(T, wLSV_fit[:,0], 'bo-', label='wLSV 1')
         ax2.plot(T, SpecFit[:,0], 'r', label='Fit')
         ax2.set_xscale('symlog', linthreshy=1)
         ax2.legend(loc=0, frameon=False)
-	axS = plt.axes([0.25, 0.1, 0.65, 0.03])
+        axS = plt.axes([0.25, 0.1, 0.65, 0.03])
         self.S = DiscreteSlider(axS, 'wLSV', 1, len(taus)+1, valinit=1, valfmt='%0.0f', increment=1)
         def update(val):
             n = int(self.S.val)
-	    ax2.clear()
-	    ax2.plot(T, wLSV_fit[:,n-1], 'bo-', label='wLSV %d'%wLSVs[n-1])
-	    ax2.plot(T, SpecFit[:,n-1], 'r', label='Fit')
-	    ax2.set_xscale('symlog', linthreshy=1)
-	    ax2.legend(loc=0, frameon=False)
-	    plt.draw()
+            ax2.clear()
+            ax2.plot(T, wLSV_fit[:,n-1], 'bo-', label='wLSV %d'%wLSVs[n-1])
+            ax2.plot(T, SpecFit[:,n-1], 'r', label='Fit')
+            ax2.set_xscale('symlog', linthreshy=1)
+            ax2.legend(loc=0, frameon=False)
+            plt.draw()
         self.S.on_changed(update)
-	plt.draw()
-
-        
-        
+        plt.show()

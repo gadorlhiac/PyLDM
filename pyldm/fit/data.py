@@ -42,43 +42,43 @@ class Data(object):
                     temp = line.split(',')
                     self.times.append(float(temp[0]))
                     self.data.append(list(map(float, temp[1:])))
-	self.data = np.array(self.data)
+        self.data = np.array(self.data)
         self.data_dechirped = np.copy(self.data)
- 	self.times = np.array(self.times)
-    	self.wls = np.array(self.wls)
+        self.times = np.array(self.times)
+        self.wls = np.array(self.wls)
 
         if 0 in self.times:
             self.izero = np.where(self.times==0)[0]
         else:
             print("Data set does not contain 0 time point. Setting start time to first positive time point.")
             self.izero = np.where(self.times > 0)[0][0]
-	self.wls_work = np.copy(self.wls)
-	self.data_work = np.copy(self.data_dechirped[self.izero[0]:,:])
-	self.times_work = np.copy(self.times[self.izero[0]:])
-	self.U, self.S, self.Vt = np.linalg.svd(self.data_work, full_matrices=False)
+        self.wls_work = np.copy(self.wls)
+        self.data_work = np.copy(self.data_dechirped[self.izero[0]:,:])
+        self.times_work = np.copy(self.times[self.izero[0]:])
+        self.U, self.S, self.Vt = np.linalg.svd(self.data_work, full_matrices=False)
 
     def truncData(self, wLSVs):
-	U, S, Vt = np.linalg.svd(self.data, full_matrices=False)
-	if wLSVs == None:
-	    print('Error enter wLSVs')
-	elif len(wLSVs) == 1:
-	    S = np.diag(self.S)
-	    self.data = U[:, :wLSVs[0]].dot(S[:wLSVs[0], :wLSVs[0]]).dot(Vt[:wLSVs[0],:]) 
-	else:
-	    Uprime = np.zeros([len(self.times), len(wLSVs)])
-	    Vtprime = np.zeros([len(wLSVs), len(self.wls)])
-	    Sprime = np.zeros([len(wLSVs)])
-	    for j in range(len(wLSVs)):
-		Uprime[:, j] = U[:, wLSVs[j]]
-		Vtprime[j, :] = Vt[wLSVs[j], :]
-		Sprime[j] = S[wLSVs[j]]
-	    Sprime = diag(Sprime)
-	    self.data = Uprime.dot(Sprime).dot(Vtprime)
+        U, S, Vt = np.linalg.svd(self.data, full_matrices=False)
+        if wLSVs == None:
+            print('Error enter wLSVs')
+        elif len(wLSVs) == 1:
+            S = np.diag(self.S)
+            self.data = U[:, :wLSVs[0]].dot(S[:wLSVs[0], :wLSVs[0]]).dot(Vt[:wLSVs[0],:])
+        else:
+            Uprime = np.zeros([len(self.times), len(wLSVs)])
+            Vtprime = np.zeros([len(wLSVs), len(self.wls)])
+            Sprime = np.zeros([len(wLSVs)])
+            for j in range(len(wLSVs)):
+                Uprime[:, j] = U[:, wLSVs[j]]
+                Vtprime[j, :] = Vt[wLSVs[j], :]
+                Sprime[j] = S[wLSVs[j]]
+                Sprime = np.diag(Sprime)
+            self.data = Uprime.dot(Sprime).dot(Vtprime)
     
     def display(self):
         self.fig_raw_data = plt.figure()
         self.fig_raw_data.canvas.set_window_title('Raw Data')
-	d = plt.contourf(self.wls_work, self.times_work, self.data_work)
+        d = plt.contourf(self.wls_work, self.times_work, self.data_work)
         plt.yscale('symlog', linthreshy=1)
         plt.ylabel('Time')
         plt.xlabel('Wavelength')
@@ -86,10 +86,10 @@ class Data(object):
         plt.draw()
 
     def updateBounds(self, wl_lb, wl_ub, t0, t):
-	self.wls_work = np.copy(self.wls[wl_lb:wl_ub])
-	self.times_work = np.copy(self.times[t0:t])
-	self.data_work = np.copy(self.data_dechirped[t0:t, wl_lb:wl_ub])
-	self.U, self.S, self.Vt = np.linalg.svd(self.data_work, full_matrices=False)
+        self.wls_work = np.copy(self.wls[wl_lb:wl_ub])
+        self.times_work = np.copy(self.times[t0:t])
+        self.data_work = np.copy(self.data_dechirped[t0:t, wl_lb:wl_ub])
+        self.U, self.S, self.Vt = np.linalg.svd(self.data_work, full_matrices=False)
 
     def updateIRF(self, order, fwhm, munot, mus, lamnot):
         self.chirporder = order
@@ -187,20 +187,19 @@ class Data(object):
         return chirp
 
     def get_SVD(self):
-	return self.U, self.S, self.Vt
+        return self.U, self.S, self.Vt
 
     def get_IRF(self):
-	return self.chirporder, self.FWHM, self.munot, self.mu, self.lamnot
+        return self.chirporder, self.FWHM, self.munot, self.mu, self.lamnot
 
     def get_T(self):
-	return self.times_work
+        return self.times_work
 
     def get_wls(self):
-	return self.wls_work
+        return self.wls_work
 
     def get_data(self):
-	return self.data_work
+        return self.data_work
 
     def set_GA_taus(self, taus):
-	pass
-	
+        pass

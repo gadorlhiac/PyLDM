@@ -32,30 +32,30 @@ from matplotlib.widgets import Slider
 
 class LDA(object):
     def __init__(self, data):
-	self.taus = np.logspace(-1, 4, 100)
+        self.taus = np.logspace(-1, 4, 100)
         self.L = np.identity(len(self.taus))
 
-	self.updateData(data)
-	self.reg = 'L2'
-	self.simfit = True #Fit all wavelengths simultaneously or individually
+        self.updateData(data)
+        self.reg = 'L2'
+        self.simfit = True #Fit all wavelengths simultaneously or individually
 
         #For hyperparameter selection in Elastic Net
-	self.rhos = np.linspace(0.1, 0.9, 9)
+        self.rhos = np.linspace(0.1, 0.9, 9)
 
     def run_LDA(self, GA_taus=None):
-	if self.reg == 'L2':
-	    GCVs, Cps = self._L2()
-	    lcurve_x, lcurve_y, k = self._lcurve()
+        if self.reg == 'L2':
+            GCVs, Cps = self._L2()
+            lcurve_x, lcurve_y, k = self._lcurve()
             self._plot_lcurve(lcurve_x, lcurve_y, k)
-	    self._plot_GCV_Cp(Cps, GCVs)
-	elif self.reg == 'L1':
-	    Cps = self._L1()
+            self._plot_GCV_Cp(Cps, GCVs)
+        elif self.reg == 'L1':
+            Cps = self._L1()
             l1x, l1y, k = self._l1curve()
             self._plot_lcurve(l1x, l1y, k)
             self._plot_GCV_Cp(Cps)
-	elif self.reg == 'elnet':
-	    self._elnet()
-	self._plot_LDM(GA_taus)
+        elif self.reg == 'elnet':
+            self._elnet()
+        self._plot_LDM(GA_taus)
 
     def replot(self, GA_taus=None, num_c=10):
         plt.close(self.fig_ldm)
@@ -67,23 +67,23 @@ class LDA(object):
 
     # Get data and IRF parameters
     def updateData(self, data):
-	self.A = data.get_data()
-	self.times = data.get_T()
-	self.wls = data.get_wls()
-	self.chirporder, self.FWHM, self.munot, self.mu, self.lamnot = data.get_IRF()
+        self.A = data.get_data()
+        self.times = data.get_T()
+        self.wls = data.get_wls()
+        self.chirporder, self.FWHM, self.munot, self.mu, self.lamnot = data.get_IRF()
         self.FWHM_mod = self.FWHM/(2*sqrt(log(2)))
         if self.FWHM != 0:
             self.wl_mus = self._calc_mu()
-	self.genD()
+        self.genD()
 
     # Get matrix LDA parameters
     def updateParams(self, taus, alphas, reg, L, simfit):
-	self.taus = taus
-	self.alphas = alphas
-	self.reg = reg
-	self.L = L
-	self.simfit = simfit
-	self.genD()
+        self.taus = taus
+        self.alphas = alphas
+        self.reg = reg
+        self.L = L
+        self.simfit = simfit
+        self.genD()
         self.x_opts = np.zeros([len(self.taus), len(self.wls), len(self.alphas)])
 
     # Calculate Wavelength Dependent mu for chirp correction
@@ -106,7 +106,7 @@ class LDA(object):
                     D[i, j] = One*Two
                 else:
                     D[i, j] = exp(-t/tau)
-	self.D = np.nan_to_num(D)
+        self.D = np.nan_to_num(D)
 
     ######################
     # Tikhonov Functions #
@@ -115,22 +115,22 @@ class LDA(object):
     # Calculate Tikhonov solutions for all wavelengths, and all alphas
     # Runs GCV and Cp, either independently or for all wavelengths simultaneously
     def _L2(self):
-	if self.simfit:
-	    GCVs = np.zeros([len(self.alphas)])
+        if self.simfit:
+            GCVs = np.zeros([len(self.alphas)])
             Cps = np.zeros([len(self.alphas)])
-	else:
-	    GCVs = np.zeros([len(self.wls), len(self.alphas)])
+        else:
+            GCVs = np.zeros([len(self.wls), len(self.alphas)])
             Cps = np.zeros([len(self.wls), len(self.alphas)])
 
-	for alpha in range(len(self.alphas)):
-	    self.x_opts[:, :, alpha] = self._solve_L2(self.alphas[alpha])
+        for alpha in range(len(self.alphas)):
+            self.x_opts[:, :, alpha] = self._solve_L2(self.alphas[alpha])
             H, S = self._calc_H_and_S(self.alphas[alpha])
             if alpha == 0:
                 n = len(self.times)
                 self.var = sum((self.D.dot(self.x_opts[:, :, 0])-self.A)**2)/n
-	    GCVs[alpha] = self._calc_GCV(alpha, H)
+            GCVs[alpha] = self._calc_GCV(alpha, H)
             Cps[alpha] = self._calc_Cp(alpha, S)
-	return GCVs, Cps
+        return GCVs, Cps
 
     def _solve_L2(self, alpha):
         if alpha != 0:
@@ -157,22 +157,22 @@ class LDA(object):
     # Calculates GCV
     def _calc_GCV(self, alpha, H):
         n = len(self.times)
-	I = np.identity(len(H))
-	tr = (np.trace(I - H)/n)**2
-	if self.simfit:
-	    res = self._calc_res(alpha)
-	else:
-	    res = np.array([self._calc_res(alpha, wl) for wl in range(len(self.wls))])
-	return res/tr
+        I = np.identity(len(H))
+        tr = (np.trace(I - H)/n)**2
+        if self.simfit:
+            res = self._calc_res(alpha)
+        else:
+            res = np.array([self._calc_res(alpha, wl) for wl in range(len(self.wls))])
+        return res/tr
 
     # Calculates Cp
     def _calc_Cp(self, alpha, S, wl=None):
         n = len(self.times)
-	if wl != None:
-	    self.var = sum((self.D.dot(self.x_opts[:, wl, 0])-self.A[:, wl])**2)/n
-	res = self._calc_res(alpha, wl)
-	df = np.trace(S)
-	return res + 2*self.var*df
+        if wl is not None:
+            self.var = sum((self.D.dot(self.x_opts[:, wl, 0])-self.A[:, wl])**2)/n
+        res = self._calc_res(alpha, wl)
+        df = np.trace(S)
+        return res + 2*self.var*df
 
     # Stores the L-Curve and MPM values
     def _lcurve(self):
@@ -220,32 +220,32 @@ class LDA(object):
 
     # Find LASSO for each alpha
     def _L1(self):
-	if self.simfit:
+        if self.simfit:
             Cps = np.zeros([len(self.alphas)])
-	else:
+        else:
             Cps = np.zeros([len(self.wls), len(self.alphas)])
 
-	G,C = self._L2() # Throw away G, C, simply initialize x_opts to have a start guess that is the Tikhonov solution
-	for i in range(len(self.alphas)):
-	    alpha = self.alphas[i]
-	    self.x_opts[:, :, i] = self._L1_min(self.D, self.A, alpha)
+        G,C = self._L2() # Throw away G, C, simply initialize x_opts to have a start guess that is the Tikhonov solution
+        for i in range(len(self.alphas)):
+            alpha = self.alphas[i]
+            self.x_opts[:, :, i] = self._L1_min(self.D, self.A, alpha)
             Cps[i] = self._calc_L1_Cp(i)
         return Cps
 
     # Giving same result for first and last alpha ???
     # Does the regularized least squares after converting to orthogonal design matrix
     def _L1_min(self, D, A, alpha):
-	p = len(D[0])
-	Dt = np.transpose(D)
-	cov = Dt.dot(D)
-	g, v = eigs(cov, k=1, ncv=len(D))
-	I = np.identity(p)
-	B = g*I - cov
-	if self.reg == 'elnet':
-	    x = self.x_opts[:, :, 0, 0]
-	else:
-	    x = self.x_opts[:, :, 0]
-	cond = np.array([1])
+        p = len(D[0])
+        Dt = np.transpose(D)
+        cov = Dt.dot(D)
+        g, v = eigs(cov, k=1, ncv=len(D))
+        I = np.identity(p)
+        B = g*I - cov
+        if self.reg == 'elnet':
+            x = self.x_opts[:, :, 0, 0]
+        else:
+            x = self.x_opts[:, :, 0]
+        cond = np.array([1])
         for i in range(len(x)):
             for j in range(len(x[0])):
                 cond = np.array([1])
@@ -257,19 +257,19 @@ class LDA(object):
                     x_new = sgn*np.maximum((absolute-alpha)/g, 0)
                     x[i, j] = np.real(x_new)
                     cond = (x[i, j]-x_old[i, j])/x_old[i, j]
-	return x
+        return x
 
     def _calc_L1_Cp(self, alpha, wl=None):
         n = len(self.times)
-	if wl != None:
-	    self.var = sum((self.D.dot(self.x_opts[:, wl, 0])-self.A[:, wl])**2)/n
-	res = self._calc_res(alpha, wl)
+        if wl is not None:
+            self.var = sum((self.D.dot(self.x_opts[:, wl, 0])-self.A[:, wl])**2)/n
+        res = self._calc_res(alpha, wl)
         X = np.transpose(self.D).dot(self.D) + self.alphas[alpha]*np.transpose(self.L).dot(self.L)
         U, S, Vt = np.linalg.svd(X, full_matrices=False)
         Xinv = np.transpose(Vt).dot(np.diag(1/S)).dot(np.transpose(U))
         S = Xinv.dot(np.transpose(self.D).dot(self.D))
         df = np.trace(S)
-	return res + 2*self.var*df
+        return res + 2*self.var*df
 
     def _l1curve(self):
         if self.simfit:
@@ -299,21 +299,21 @@ class LDA(object):
         x = self.x_opts[:, :, 0]
         self.x_opts = np.zeros([len(self.taus), len(self.wls), len(self.alphas), len(self.rhos)])
         self.x_opts[:, :, 0, 0] = x
-	for i in range(len(self.alphas)):
-	    alpha = self.alphas[i]
-	    for j in range(len(self.rhos)):
-		rho = self.rhos[j]
-		a1 = rho*alpha
-		a2 = (1-rho)*alpha
-		atil = a1/(sqrt(1+a2))
+        for i in range(len(self.alphas)):
+            alpha = self.alphas[i]
+            for j in range(len(self.rhos)):
+                rho = self.rhos[j]
+                a1 = rho*alpha
+                a2 = (1-rho)*alpha
+                atil = a1/(sqrt(1+a2))
 
-		D_aug = np.concatenate((self.D, sqrt(a2)*self.L))
-		D_aug *= (1 + sqrt(a2))**(-.5)
+                D_aug = np.concatenate((self.D, sqrt(a2)*self.L))
+                D_aug *= (1 + sqrt(a2))**(-.5)
 
-		A_aug = np.concatenate((self.A, np.zeros([len(self.L), len(self.wls)])))
+                A_aug = np.concatenate((self.A, np.zeros([len(self.L), len(self.wls)])))
 
-		x_naive = self._L1_min(D_aug, A_aug, atil)
-		self.x_opts[:, :, i, j] = (1 + a2)*x_naive
+                x_naive = self._L1_min(D_aug, A_aug, atil)
+                self.x_opts[:, :, i, j] = (1 + a2)*x_naive
 
     ##################
     # TSVD Functions #
@@ -325,18 +325,18 @@ class LDA(object):
         self.genD()
         x = self._tsvd(k)
         fig_tsvd = plt.figure()
-	fig_tsvd.canvas.set_window_title('TSVD LDM')
-	max_c = np.max(np.absolute(x))
-	num_c = 12
-	C_pos = np.linspace(0, max_c, num_c)
-	C_neg = np.linspace(-max_c, 0, num_c, endpoint=False)
-	Contour_Levels = np.concatenate((C_neg, C_pos))
-	ax = fig_tsvd.add_subplot(111)
+        fig_tsvd.canvas.set_window_title('TSVD LDM')
+        max_c = np.max(np.absolute(x))
+        num_c = 12
+        C_pos = np.linspace(0, max_c, num_c)
+        C_neg = np.linspace(-max_c, 0, num_c, endpoint=False)
+        Contour_Levels = np.concatenate((C_neg, C_pos))
+        ax = fig_tsvd.add_subplot(111)
         C = ax.contourf(self.wls, self.taus, x, cmap=plt.cm.seismic, levels=Contour_Levels)
-	if GA_taus != None:
-	    for i in range(len(GA_taus)):
-		ax.axhline(GA_taus[i], linestyle='dashed', color='k')
-	ax.set_yscale('log')
+        if GA_taus is not None:
+            for i in range(len(GA_taus)):
+                ax.axhline(GA_taus[i], linestyle='dashed', color='k')
+        ax.set_yscale('log')
         plt.colorbar(C)
         ax.set_ylabel(r'$\tau$', fontsize=14)
         ax.set_xlabel('Wavelength', fontsize=14)
@@ -345,19 +345,19 @@ class LDA(object):
 
     # Actual solution
     def _tsvd(self, k):
-	D_plus = self._tsvdInv(k)
-	x_k = D_plus.dot(self.A)
-	return x_k
+        D_plus = self._tsvdInv(k)
+        x_k = D_plus.dot(self.A)
+        return x_k
 
     # Truncated inverse
     def _tsvdInv(self, k):
-	U, S, Vt = np.linalg.svd(self.D, full_matrices=False)
-	V = np.transpose(Vt)
-	Ut = np.transpose(U)
-	S = 1/S
-	S = np.array([S[i] if i < k else 0 for i in range(len(S))])
-	S = np.diag(S)
-	return V.dot(S).dot(Ut)
+        U, S, Vt = np.linalg.svd(self.D, full_matrices=False)
+        V = np.transpose(Vt)
+        Ut = np.transpose(U)
+        S = 1/S
+        S = np.array([S[i] if i < k else 0 for i in range(len(S))])
+        S = np.diag(S)
+        return V.dot(S).dot(Ut)
 
     # Picard condition for K selection
     def _picard(self):
@@ -391,16 +391,16 @@ class LDA(object):
         plt.draw()
 
     def _plot_GCV_Cp(self, Cps, GCVs=None):
-	fig_gcv = plt.figure()
+        fig_gcv = plt.figure()
         fig_gcv.canvas.set_window_title('Cps')
-	ax = fig_gcv.add_subplot(121)
-	ax.plot(self.alphas, Cps, 'bo-')
+        ax = fig_gcv.add_subplot(121)
+        ax.plot(self.alphas, Cps, 'bo-')
         Cpmin = Cps.argmin()
         ax.plot(self.alphas[Cpmin], Cps[Cpmin], 'ro')
         ax.annotate(self.alphas[Cpmin], (self.alphas[Cpmin], Cps[Cpmin]))
         ax.set_xlabel('Alpha', fontsize=14)
         ax.set_title('Cp', fontsize=16)
-        if GCVs != None:
+        if GCVs is not None:
             fig_gcv.canvas.set_window_title('Cps and GCVs')
             ax2 = fig_gcv.add_subplot(122)
             ax2.plot(self.alphas, GCVs, 'bo-')
@@ -409,32 +409,32 @@ class LDA(object):
             ax2.annotate(self.alphas[GCVmin], (self.alphas[GCVmin], GCVs[GCVmin]))
             ax2.set_title('GCV', fontsize=16)
             ax2.set_xlabel('Alpha', fontsize=14)
-	plt.draw()
+        plt.draw()
 
     def _plot_LDM(self, GA_taus=None, num_c=10):
-	self.fig_ldm = plt.figure()
-	self.fig_ldm.canvas.set_window_title('LDM')
-	self.ax = self.fig_ldm.add_subplot(121)
-	max_c = np.max(np.absolute(self.x_opts[:, :, 0]))
-	if max_c > 0:
-	    C_pos = np.linspace(0, max_c, num_c)
-	    C_neg = np.linspace(-max_c, 0, num_c, endpoint=False)
-	    Contour_Levels = np.concatenate((C_neg, C_pos))
-	else:
-	    Contour_Levels = [0]
-	if self.reg == 'elnet':
+        self.fig_ldm = plt.figure()
+        self.fig_ldm.canvas.set_window_title('LDM')
+        self.ax = self.fig_ldm.add_subplot(121)
+        max_c = np.max(np.absolute(self.x_opts[:, :, 0]))
+        if max_c > 0:
+            C_pos = np.linspace(0, max_c, num_c)
+            C_neg = np.linspace(-max_c, 0, num_c, endpoint=False)
+            Contour_Levels = np.concatenate((C_neg, C_pos))
+        else:
+            Contour_Levels = [0]
+        if self.reg == 'elnet':
             C = self.ax.contourf(self.wls, self.taus, self.x_opts[:,:,0, 6], cmap=plt.cm.seismic, levels=Contour_Levels)
-	else:
+        else:
             C = self.ax.contourf(self.wls, self.taus, self.x_opts[:,:,0], cmap=plt.cm.seismic, levels=Contour_Levels)
         plt.colorbar(C)
-	self.ax.set_yscale('log')
+        self.ax.set_yscale('log')
         self.ax.set_ylabel(r'$\tau$', fontsize=14)
         self.ax.set_xlabel('Wavelength', fontsize=14)
         self.ax.set_title('Alpha = %f' % self.alphas[0])
-	if GA_taus != None:
-	    for i in range(len(GA_taus)):
-		self.ax.axhline(GA_taus[i], linestyle='dashed', color='k')
-	self.ax2 = self.fig_ldm.add_subplot(122)
+        if GA_taus is not None:
+            for i in range(len(GA_taus)):
+    	        self.ax.axhline(GA_taus[i], linestyle='dashed', color='k')
+        self.ax2 = self.fig_ldm.add_subplot(122)
         self.ax2.set_title('Wavelength = %f' % self.wls[0])
         if self.reg == 'elnet':
             self.ax2.plot(self.taus, self.x_opts[:,0,0,6])
@@ -450,8 +450,8 @@ class LDA(object):
             for i in range(len(Contour_Levels)):
                 self.ax2.axhline(Contour_Levels[i], linestyle='dashed', color='k')
 
-	plt.subplots_adjust(left=0.25, bottom=0.25)
-	self.axS = plt.axes([0.25, 0.1, 0.65, 0.03]) # Alpha slider
+        plt.subplots_adjust(left=0.25, bottom=0.25)
+        self.axS = plt.axes([0.25, 0.1, 0.65, 0.03]) # Alpha slider
         self.axS2 = plt.axes([0.25, 0.015, 0.65, 0.03]) # Wavelength slider
         if self.reg == 'elnet':
             self.axS3 = plt.axes([0.25, 0.055, 0.65, 0.03])
@@ -476,12 +476,12 @@ class LDA(object):
             self.S.valtext.set_visible(False)
             self.S2.valtext.set_visible(False)
 
-	    self.ax.clear()
+            self.ax.clear()
             self.ax2.clear()
             self.ax.set_title('Alpha = %f' % self.alphas[a])
             self.ax.set_ylabel(r'$\tau$', fontsize=16)
             self.ax.set_xlabel('Wavelength', fontsize=16)
-	    self.ax.set_yscale('log')
+            self.ax.set_yscale('log')
 
             self.ax2.set_title('Wavelength = %f' % self.wls[wl])
             self.ax2.set_xscale('log')
@@ -502,17 +502,17 @@ class LDA(object):
             else:
                 Contour_Levels = None
 
-	    if self.reg == 'elnet':
-	    	C = self.ax.contourf(self.wls, self.taus, self.x_opts[:, :, a, r], cmap=plt.cm.seismic, levels=Contour_Levels)
+            if self.reg == 'elnet':
+                C = self.ax.contourf(self.wls, self.taus, self.x_opts[:, :, a, r], cmap=plt.cm.seismic, levels=Contour_Levels)
                 self.ax2.plot(self.taus, self.x_opts[:, wl, a, r])
-	    else:
-	    	C = self.ax.contourf(self.wls, self.taus, self.x_opts[:, :, a], cmap=plt.cm.seismic, levels=Contour_Levels)
+            else:
+                C = self.ax.contourf(self.wls, self.taus, self.x_opts[:, :, a], cmap=plt.cm.seismic, levels=Contour_Levels)
                 self.ax2.plot(self.taus, self.x_opts[:, wl, a])
             plt.colorbar(C)
 
-	    if GA_taus != None:
-	        for i in range(len(GA_taus)):
-		    self.ax.axhline(GA_taus[i], linestyle='dashed', color='k')
+            if GA_taus is not None:
+                for i in range(len(GA_taus)):
+                    self.ax.axhline(GA_taus[i], linestyle='dashed', color='k')
 
             if len(Contour_Levels) > 1:
                 for i in range(len(Contour_Levels)):
@@ -524,5 +524,5 @@ class LDA(object):
         self.S2.on_changed(update)
         if self.reg == 'elnet':
             self.S3.on_changed(update)
-	plt.show()
+        plt.show()
 
