@@ -21,12 +21,12 @@ import numpy as np
 from numpy.linalg import *
 from scipy import *
 from scipy.sparse.linalg import eigs
-from scipy.interpolate import *
-from scipy.special import *
-from scipy.linalg import rq
+#from scipy.interpolate import *
+#from scipy.special import *
+#from scipy.linalg import rq
 from matplotlib import *
 import matplotlib.pyplot as plt
-import scipy.optimize as sciopt
+#import scipy.optimize as sciopt
 from matplotlib.widgets import Slider
 
 
