@@ -384,10 +384,10 @@ class Main(tk.Frame):
 
     def mat_lda(self):
         if self.taulinlogvar.get() == 'log':
-            taus = np.logspace(float(self.taumin.get()), float(self.taumax.get()), float(self.numtau.get()))
+            taus = np.logspace(float(self.taumin.get()), float(self.taumax.get()), int(self.numtau.get()))
         else:
-            taus = np.linspace(float(self.taumin.get()), float(self.taumax.get()), float(self.numtau.get()))
-        alphas = np.linspace(float(self.alphamin.get()), float(self.alphamax.get()), float(self.numalphas.get()))
+            taus = np.linspace(float(self.taumin.get()), float(self.taumax.get()), int(self.numtau.get()))
+        alphas = np.linspace(float(self.alphamin.get()), float(self.alphamax.get()), int(self.numalphas.get()))
         reg = self.regvar.get()
         L = self.getL(taus)
         simfit = self.simfitvar.get()
