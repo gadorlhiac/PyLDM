@@ -49,7 +49,6 @@ class LDA(object):
             self._plot_GCV_Cp(Cps)
         elif self.reg == 'elnet':
             self._elnet()
-        print(GA_taus)
         self._plot_LDM(GA_taus)
 
     def replot(self, GA_taus=None, num_c=10):
@@ -268,10 +267,10 @@ class LDA(object):
 
     def _l1curve(self):
         if self.simfit:
-            l1x = np.array([sqrt(self._calc_res(a)) for a in range(len(self.alphas))])
+            l1x = np.array([self._calc_res(a)**0.5 for a in range(len(self.alphas))])
             l1y = np.array([self._calc_L1Norm(a) for a in range(len(self.alphas))])
         else:
-            l1x = np.array([[sqrt(self._calc_res(a, wl)) for wl in range(len(self.wls))] for a in range(len(self.alphas))])
+            l1x = np.array([[self._calc_res(a, wl)**0.5 for wl in range(len(self.wls))] for a in range(len(self.alphas))])
             l1y = np.array([[self._calc_L1Norm(a, wl) for wl in range(len(self.wls))] for a in range(len(self.alphas))])
         k = self._calc_k(l1x, l1y)
         return l1x, l1y, k
@@ -298,12 +297,12 @@ class LDA(object):
             alpha = self.alphas[i]
             for j in range(len(self.rhos)):
                 rho = self.rhos[j]
-                a1 = rho*alpha
-                a2 = (1-rho)*alpha
-                atil = a1/(sqrt(1+a2))
+                a1 = rho * alpha
+                a2 = (1 - rho) * alpha
+                atil = a1/((1 + a2)**0.5)
 
-                D_aug = np.concatenate((self.D, sqrt(a2)*self.L))
-                D_aug *= (1 + sqrt(a2))**(-.5)
+                D_aug = np.concatenate((self.D, a2**0.5 * self.L))
+                D_aug *= (1 + a2**0.5)**(-.5)
 
                 A_aug = np.concatenate((self.A, np.zeros([len(self.L), len(self.wls)])))
 
