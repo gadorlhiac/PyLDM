@@ -177,21 +177,20 @@ class LDA(object):
             lcurve_x = np.array([[self._calc_res(a, wl)**0.5 for wl in range(len(self.wls))] for a in range(len(self.alphas))])
             lcurve_y = np.array([[self._calc_smoothNorm(a, wl) for wl in range(len(self.wls))] for a in range(len(self.alphas))])
         k = self._calc_k(lcurve_x, lcurve_y)
-
         return lcurve_x, lcurve_y,  k
 
     # Curvature function, for finding optimal alpha on L-curve
     def _calc_k(self, lx, ly):
-        #dx = np.gradient(lx)
-        #dy = np.gradient(ly, dx)
-        #d2y = np.gradient(dy, dx)
-        #k = abs(d2y)/(1+dy**2)**(1.5)
-        da = np.gradient(self.alphas)
-        dx = np.gradient(lx, da)
-        dy = np.gradient(ly, da)
-        d2x = np.gradient(dx, da)
-        d2y = np.gradient(dy, da)
-        k = (dx*d2y - d2x*dy)/(dx**2 + dy**2)**(1.5)
+        dx = np.gradient(lx)
+        dy = np.gradient(ly, dx)
+        d2y = np.gradient(dy, dx)
+        k = np.abs(d2y)/(1+dy**2)**(1.5)
+        #da = np.gradient(self.alphas)
+        #dx = np.gradient(lx, da)
+        #dy = np.gradient(ly, da)
+        #d2x = np.gradient(dx, da)
+        #d2y = np.gradient(dy, da)
+        #k = (dx*d2y - d2x*dy)/(dx**2 + dy**2)**(1.5)
         return k
 
     # Residuals and norms
