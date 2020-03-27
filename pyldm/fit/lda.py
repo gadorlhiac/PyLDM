@@ -18,15 +18,9 @@
 
  """
 import numpy as np
-from numpy.linalg import *
-from scipy import *
-from scipy.sparse.linalg import eigs
-#from scipy.interpolate import *
-#from scipy.special import *
-#from scipy.linalg import rq
-from matplotlib import *
 import matplotlib.pyplot as plt
-#import scipy.optimize as sciopt
+from scipy.sparse.linalg import eigs
+from scipy.special import erf
 from matplotlib.widgets import Slider
 
 
@@ -71,7 +65,7 @@ class LDA(object):
         self.times = data.get_T()
         self.wls = data.get_wls()
         self.chirporder, self.FWHM, self.munot, self.mu, self.lamnot = data.get_IRF()
-        self.FWHM_mod = self.FWHM/(2*sqrt(log(2)))
+        self.FWHM_mod = self.FWHM/(2*np.log(2)**0.5)
         if self.FWHM != 0:
             self.wl_mus = self._calc_mu()
         self.genD()
@@ -101,11 +95,11 @@ class LDA(object):
                 t = self.times[i]
                 tau = self.taus[j]
                 if self.FWHM_mod != 0:
-                    One = 0.5*(exp(-t/tau)*exp(self.FWHM_mod**2/(2*tau))/tau)
-                    Two = 1 + erf((t-(self.FWHM_mod**2/tau))/(sqrt(2)*self.FWHM_mod))
+                    One = 0.5*(np.exp(-t/tau)*np.exp(self.FWHM_mod**2/(2*tau))/tau)
+                    Two = 1 + erf((t-(self.FWHM_mod**2/tau))/(2**0.5*self.FWHM_mod))
                     D[i, j] = One*Two
                 else:
-                    D[i, j] = exp(-t/tau)
+                    D[i, j] = np.exp(-t/tau)
         self.D = np.nan_to_num(D)
 
     ######################
@@ -127,7 +121,7 @@ class LDA(object):
             H, S = self._calc_H_and_S(self.alphas[alpha])
             if alpha == 0:
                 n = len(self.times)
-                self.var = sum((self.D.dot(self.x_opts[:, :, 0])-self.A)**2)/n
+                self.var = np.sum(((self.D @ self.x_opts[:, :, 0]) - self.A)**2)/n
             GCVs[alpha] = self._calc_GCV(alpha, H)
             Cps[alpha] = self._calc_Cp(alpha, S)
         return GCVs, Cps
@@ -143,15 +137,15 @@ class LDA(object):
         V = np.transpose(Vt)
         Ut = np.transpose(U)
         Sinv = np.diag(1/S)
-        x_opt = V.dot(Sinv).dot(Ut).dot(A_aug)
+        x_opt = V @ Sinv @ Ut  @ A_aug
         return x_opt
 
     def _calc_H_and_S(self, alpha):
-        X = np.transpose(self.D).dot(self.D) + alpha*np.transpose(self.L).dot(self.L)
+        X = np.transpose(self.D) @ self.D + alpha * (np.transpose(self.L) @ self.L)
         U, S, Vt = np.linalg.svd(X, full_matrices=False)
-        Xinv = np.transpose(Vt).dot(np.diag(1/S)).dot(np.transpose(U))
-        H = self.D.dot(Xinv).dot(np.transpose(self.D))
-        S = Xinv.dot(np.transpose(self.D).dot(self.D))
+        Xinv = np.transpose(Vt) @ np.diag(1/S) @ np.transpose(U)
+        H = self.D @ Xinv @ np.transpose(self.D)
+        S = Xinv @ (np.transpose(self.D) @ self.D)
         return H, S
 
     # Calculates GCV
@@ -169,7 +163,7 @@ class LDA(object):
     def _calc_Cp(self, alpha, S, wl=None):
         n = len(self.times)
         if wl is not None:
-            self.var = sum((self.D.dot(self.x_opts[:, wl, 0])-self.A[:, wl])**2)/n
+            self.var = np.sum(((self.D @ self.x_opts[:, wl, 0]) - self.A[:, wl])**2)/n
         res = self._calc_res(alpha, wl)
         df = np.trace(S)
         return res + 2*self.var*df
@@ -177,10 +171,10 @@ class LDA(object):
     # Stores the L-Curve and MPM values
     def _lcurve(self):
         if self.simfit:
-            lcurve_x = np.array([sqrt(self._calc_res(a)) for a in range(len(self.alphas))])
+            lcurve_x = np.array([self._calc_res(a)**0.5 for a in range(len(self.alphas))])
             lcurve_y = np.array([self._calc_smoothNorm(a) for a in range(len(self.alphas))])
         else:
-            lcurve_x = np.array([[sqrt(self._calc_res(a, wl)) for wl in range(len(self.wls))] for a in range(len(self.alphas))])
+            lcurve_x = np.array([[self._calc_res(a, wl)**0.5 for wl in range(len(self.wls))] for a in range(len(self.alphas))])
             lcurve_y = np.array([[self._calc_smoothNorm(a, wl) for wl in range(len(self.wls))] for a in range(len(self.alphas))])
         k = self._calc_k(lcurve_x, lcurve_y)
 
@@ -203,15 +197,15 @@ class LDA(object):
     # Residuals and norms
     def _calc_res(self, alpha, wl=None):
         if wl == None:
-            return sum((self.D.dot(self.x_opts[:, :, alpha])-self.A)**2)
+            return np.sum(((self.D @ self.x_opts[:, :, alpha]) - self.A)**2)
         else:
-            return sum((self.D.dot(self.x_opts[:, wl, alpha])-self.A[:, wl])**2)
+            return np.sum(((self.D @ self.x_opts[:, wl, alpha]) - self.A[:, wl])**2)
 
     def _calc_smoothNorm(self, alpha, wl=None):
         if wl == None:
-            return sum((self.L.dot(self.x_opts[:, :, alpha]))**2)**(0.5)
+            return np.sum((self.L @ self.x_opts[:, :, alpha])**2)**(0.5)
         else:
-            return sum((self.L.dot(self.x_opts[:, wl, alpha]))**2)**(0.5)
+            return np.sum((self.L @ self.x_opts[:, wl, alpha])**2)**(0.5)
 
 
     ###################
@@ -237,7 +231,7 @@ class LDA(object):
     def _L1_min(self, D, A, alpha):
         p = len(D[0])
         Dt = np.transpose(D)
-        cov = Dt.dot(D)
+        cov = Dt @ D
         g, v = eigs(cov, k=1, ncv=len(D))
         I = np.identity(p)
         B = g*I - cov
@@ -251,10 +245,10 @@ class LDA(object):
                 cond = np.array([1])
                 while cond > 1e-8 and x[i, j] != 0: # Can change tolerance here
                     x_old = np.copy(x)
-                    U = Dt.dot(A[:, j]) + B.dot(x_old[:, j])
+                    U = (Dt @ A[:, j]) + (B @ x_old[:, j])
                     sgn = np.sign(U[i])
-                    absolute = np.absolute(U[i])
-                    x_new = sgn*np.maximum((absolute-alpha)/g, 0)
+                    absolute = np.abs(U[i])
+                    x_new = sgn*np.maximum((absolute - alpha)/g, 0)
                     x[i, j] = np.real(x_new)
                     cond = (x[i, j]-x_old[i, j])/x_old[i, j]
         return x
@@ -262,12 +256,12 @@ class LDA(object):
     def _calc_L1_Cp(self, alpha, wl=None):
         n = len(self.times)
         if wl is not None:
-            self.var = sum((self.D.dot(self.x_opts[:, wl, 0])-self.A[:, wl])**2)/n
+            self.var = np.sum(((self.D @ self.x_opts[:, wl, 0]) - self.A[:, wl])**2)/n
         res = self._calc_res(alpha, wl)
-        X = np.transpose(self.D).dot(self.D) + self.alphas[alpha]*np.transpose(self.L).dot(self.L)
+        X = (np.transpose(self.D) @ self.D) + self.alphas[alpha] * (np.transpose(self.L) @ self.L)
         U, S, Vt = np.linalg.svd(X, full_matrices=False)
-        Xinv = np.transpose(Vt).dot(np.diag(1/S)).dot(np.transpose(U))
-        S = Xinv.dot(np.transpose(self.D).dot(self.D))
+        Xinv = np.transpose(Vt) @ np.diag(1/S) @ np.transpose(U)
+        S = Xinv @ (np.transpose(self.D) @ self.D)
         df = np.trace(S)
         return res + 2*self.var*df
 
@@ -283,9 +277,9 @@ class LDA(object):
 
     def _calc_L1Norm(self, alpha, wl=None):
         if wl == None:
-            return sum(abs(self.L.dot(self.x_opts[:, :, alpha])))
+            return np.sum(np.abs(self.L @ self.x_opts[:, :, alpha]))
         else:
-            return sum(abs(self.L.dot(self.x_opts[:, wl, alpha])))
+            return np.sum(np.abs(self.L @ self.x_opts[:, wl, alpha]))
 
 
     #########################
@@ -326,10 +320,9 @@ class LDA(object):
         x = self._tsvd(k)
         fig_tsvd = plt.figure()
         fig_tsvd.canvas.set_window_title('TSVD LDM')
-        max_c = np.max(np.absolute(x))
         num_c = 12
-        C_pos = np.linspace(0, max_c, num_c)
-        C_neg = np.linspace(-max_c, 0, num_c, endpoint=False)
+        C_pos = np.linspace(0, np.max(x), num_c)
+        C_neg = np.linspace(np.min(x), 0, num_c, endpoint=False)
         Contour_Levels = np.concatenate((C_neg, C_pos))
         ax = fig_tsvd.add_subplot(111)
         C = ax.contourf(self.wls, self.taus, x, cmap=plt.cm.seismic, levels=Contour_Levels)
@@ -346,7 +339,7 @@ class LDA(object):
     # Actual solution
     def _tsvd(self, k):
         D_plus = self._tsvdInv(k)
-        x_k = D_plus.dot(self.A)
+        x_k = D_plus @ self.A
         return x_k
 
     # Truncated inverse
@@ -357,7 +350,7 @@ class LDA(object):
         S = 1/S
         S = np.array([S[i] if i < k else 0 for i in range(len(S))])
         S = np.diag(S)
-        return V.dot(S).dot(Ut)
+        return V @ S @ Ut
 
     # Picard condition for K selection
     def _picard(self):
@@ -469,12 +462,12 @@ class LDA(object):
 
         # Alpha slider
         self.axS = plt.axes([0.25, 0.1, 0.65, 0.03])
-        self.S = Slider(self.axS, 'alpha', 0, len(self.alphas), valinit=0)
+        self.S = Slider(self.axS, 'alpha', 0, len(self.alphas) - 1, valinit=0)
         self.S.valtext.set_visible(False)
 
         # Wavelength slider
         self.axS2 = plt.axes([0.25, 0.015, 0.65, 0.03])
-        self.S2 = Slider(self.axS2, 'Wavelength', 0, len(self.wls), valinit=0)
+        self.S2 = Slider(self.axS2, 'Wavelength', 0, len(self.wls) - 1, valinit=0)
         self.S2.valtext.set_visible(False)
 
         # Rho slider
