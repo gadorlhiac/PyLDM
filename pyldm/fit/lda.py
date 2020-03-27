@@ -414,51 +414,72 @@ class LDA(object):
     def _plot_LDM(self, GA_taus=None, num_c=10):
         self.fig_ldm = plt.figure()
         self.fig_ldm.canvas.set_window_title('LDM')
+
+        # LDM
         self.ax = self.fig_ldm.add_subplot(121)
-        max_c = np.max(np.absolute(self.x_opts[:, :, 0]))
-        if max_c > 0:
-            C_pos = np.linspace(0, max_c, num_c)
-            C_neg = np.linspace(-max_c, 0, num_c, endpoint=False)
-            Contour_Levels = np.concatenate((C_neg, C_pos))
-        else:
-            Contour_Levels = [0]
-        if self.reg == 'elnet':
-            C = self.ax.contourf(self.wls, self.taus, self.x_opts[:,:,0, 6], cmap=plt.cm.seismic, levels=Contour_Levels)
-        else:
-            C = self.ax.contourf(self.wls, self.taus, self.x_opts[:,:,0], cmap=plt.cm.seismic, levels=Contour_Levels)
-        plt.colorbar(C)
         self.ax.set_yscale('log')
         self.ax.set_ylabel(r'$\tau$', fontsize=14)
         self.ax.set_xlabel('Wavelength', fontsize=14)
         self.ax.set_title('Alpha = %f' % self.alphas[0])
-        if GA_taus is not None:
-            for i in range(len(GA_taus)):
-    	        self.ax.axhline(GA_taus[i], linestyle='dashed', color='k')
+
+        if self.reg == 'elnet':
+            C_pos = np.linspace(0, np.max(self.x_opts[:, :, 0, 6]), num_c)
+            C_neg = np.linspace(np.min(self.x_opts[:, :, 0, 6]), 0, num_c, endpoint=False)
+            Contour_Levels = np.concatenate((C_neg, C_pos))
+            self.C = self.ax.contourf(self.wls, self.taus, self.x_opts[:, :, 0, 6], cmap=plt.cm.seismic, levels=Contour_Levels)
+        else:
+            C_pos = np.linspace(0, np.max(self.x_opts[:, :, 0]), num_c)
+            C_neg = np.linspace(np.min(self.x_opts[:, :, 0]), 0, num_c, endpoint=False)
+            Contour_Levels = np.concatenate((C_neg, C_pos))
+            self.C = self.ax.contourf(self.wls, self.taus, self.x_opts[:, :, 0], cmap=plt.cm.seismic, levels=Contour_Levels)
+
+        # Need to hold on to the colorbar, and it's axis.
+        # Because it is the second axis created, it will be second in the fig
+        # axes.  It needs to be manually cleared and reupdated.
+        self.cbar = self.fig_ldm.colorbar(self.C)
+        self.cbar_ax = self.fig_ldm.axes[1]
+
+        # Wavelength trace plot
         self.ax2 = self.fig_ldm.add_subplot(122)
         self.ax2.set_title('Wavelength = %f' % self.wls[0])
-        if self.reg == 'elnet':
-            self.ax2.plot(self.taus, self.x_opts[:,0,0,6])
-        else:
-            self.ax2.plot(self.taus, self.x_opts[:,0,0])
         self.ax2.set_xscale('log')
         self.ax2.set_xlabel(r'$\tau$', fontsize=14)
         self.ax2.set_ylabel('Amplitude', fontsize=14)
         self.ax2.yaxis.set_label_position('right')
         self.ax2.yaxis.tick_right()
         self.ax2.yaxis.label.set_rotation(270)
+
+        if self.reg == 'elnet':
+            self.ax2.plot(self.taus, self.x_opts[:, 0, 0, 6])
+        else:
+            self.ax2.plot(self.taus, self.x_opts[:, 0, 0])
+
+        # Add GA lifetimes to plot
+        if GA_taus is not None:
+            for i in range(len(GA_taus)):
+    	        self.ax.axhline(GA_taus[i], linestyle='dashed', color='k')
+
+        # Add contour levels
         if len(Contour_Levels) > 0:
             for i in range(len(Contour_Levels)):
                 self.ax2.axhline(Contour_Levels[i], linestyle='dashed', color='k')
 
+        # Make space for sliders
         plt.subplots_adjust(left=0.25, bottom=0.25)
-        self.axS = plt.axes([0.25, 0.1, 0.65, 0.03]) # Alpha slider
-        self.axS2 = plt.axes([0.25, 0.015, 0.65, 0.03]) # Wavelength slider
-        if self.reg == 'elnet':
-            self.axS3 = plt.axes([0.25, 0.055, 0.65, 0.03])
+
+        # Alpha slider
+        self.axS = plt.axes([0.25, 0.1, 0.65, 0.03])
         self.S = Slider(self.axS, 'alpha', 0, len(self.alphas), valinit=0)
         self.S.valtext.set_visible(False)
+
+        # Wavelength slider
+        self.axS2 = plt.axes([0.25, 0.015, 0.65, 0.03])
         self.S2 = Slider(self.axS2, 'Wavelength', 0, len(self.wls), valinit=0)
         self.S2.valtext.set_visible(False)
+
+        # Rho slider
+        if self.reg == 'elnet':
+            self.axS3 = plt.axes([0.25, 0.055, 0.65, 0.03])
         if self.reg == 'elnet':
             self.S3 = Slider(self.axS3, 'rho', 0, len(self.rhos), valinit=6)
             self.S3.valtext.set_visible(False)
@@ -469,15 +490,26 @@ class LDA(object):
         def update(val):
             a = int(self.S.val)
             wl = int(self.S2.val)
-            if self.reg == 'elnet':
-                r = int(self.S3.val)
-                self.S3.valtext.set_visible(False)
-
-            self.S.valtext.set_visible(False)
-            self.S2.valtext.set_visible(False)
 
             self.ax.clear()
             self.ax2.clear()
+            self.cbar_ax.clear()
+
+            if self.reg == 'elnet':
+                C_pos = np.linspace(0, np.max(self.x_opts[:, :, a, r]), num_c)
+                C_neg = np.linspace(np.min(self.x_opts[:, :, a, r]), 0, num_c, endpoint=False)
+                Contour_Levels = np.concatenate((C_neg, C_pos))
+                self.C = self.ax.contourf(self.wls, self.taus, self.x_opts[:, :, a, r], cmap=plt.cm.seismic, levels=Contour_Levels)
+                self.ax2.plot(self.taus, self.x_opts[:, wl, a, r])
+            else:
+                C_pos = np.linspace(0, np.max(self.x_opts[:, :, a]), num_c)
+                C_neg = np.linspace(np.min(self.x_opts[:, :, a]), 0, num_c, endpoint=False)
+                Contour_Levels = np.concatenate((C_neg, C_pos))
+                self.C = self.ax.contourf(self.wls, self.taus, self.x_opts[:, :, a], cmap=plt.cm.seismic, levels=Contour_Levels)
+                self.ax2.plot(self.taus, self.x_opts[:, wl, a])
+
+            self.cbar = self.fig_ldm.colorbar(self.C, self.cbar_ax)
+
             self.ax.set_title('Alpha = %f' % self.alphas[a])
             self.ax.set_ylabel(r'$\tau$', fontsize=16)
             self.ax.set_xlabel('Wavelength', fontsize=16)
@@ -491,25 +523,6 @@ class LDA(object):
             self.ax2.yaxis.tick_right()
             self.ax2.yaxis.label.set_rotation(270)
 
-            if self.reg == 'elnet':
-                max_c = np.max(np.absolute(self.x_opts[:, :, a, r]))
-            else:
-                max_c = np.max(np.absolute(self.x_opts[:, :, a]))
-            if max_c > 0:
-                C_pos = np.linspace(0, max_c, num_c)
-                C_neg = np.linspace(-max_c, 0, num_c, endpoint=False)
-                Contour_Levels = np.concatenate((C_neg, C_pos))
-            else:
-                Contour_Levels = None
-
-            if self.reg == 'elnet':
-                C = self.ax.contourf(self.wls, self.taus, self.x_opts[:, :, a, r], cmap=plt.cm.seismic, levels=Contour_Levels)
-                self.ax2.plot(self.taus, self.x_opts[:, wl, a, r])
-            else:
-                C = self.ax.contourf(self.wls, self.taus, self.x_opts[:, :, a], cmap=plt.cm.seismic, levels=Contour_Levels)
-                self.ax2.plot(self.taus, self.x_opts[:, wl, a])
-            plt.colorbar(C)
-
             if GA_taus is not None:
                 for i in range(len(GA_taus)):
                     self.ax.axhline(GA_taus[i], linestyle='dashed', color='k')
@@ -518,11 +531,9 @@ class LDA(object):
                 for i in range(len(Contour_Levels)):
                     self.ax2.axhline(Contour_Levels[i], linestyle='dashed', color='k')
             self.fig_ldm.canvas.draw_idle()
-#            plt.draw()
 
         self.S.on_changed(update)
         self.S2.on_changed(update)
         if self.reg == 'elnet':
             self.S3.on_changed(update)
         plt.show()
-
