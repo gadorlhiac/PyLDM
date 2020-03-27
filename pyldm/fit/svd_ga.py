@@ -19,15 +19,11 @@
 
  """
 
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-from numpy import *
-from numpy.linalg import *
-from scipy.optimize import differential_evolution, minimize
+from scipy.optimize import minimize
 from scipy.linalg import *
-from scipy.special import *
-from random import *
+from scipy.special import erf
 from matplotlib.widgets import Slider
 from .discreteslider import DiscreteSlider
 
@@ -38,12 +34,12 @@ class SVD_GA(object):
     def updateData(self, data):
         self.U, self.S, self.Vt = data.get_SVD()
         self.Svals = self.S
-        self.S = diag(self.S)
+        self.S = np.diag(self.S)
         self.wLSV = self.U.dot(self.S)
         self.T = data.get_T()
         self.wls = data.get_wls()
         self.chirporder, self.FWHM, self.munot, self.mu, self.lamnot = data.get_IRF()
-        self.FWHM_mod = self.FWHM/(2*sqrt(log(2)))
+        self.FWHM_mod = self.FWHM/(2*np.log(2)**0.5)
 
     def display(self):
         fig = plt.figure()
@@ -78,16 +74,16 @@ class SVD_GA(object):
                 t = T[i]
                 tau = taus[j]
                 if fit_irf:
-                    One = 0.5*(exp(-t/tau)*exp(fwhm_mod**2/(2*tau))/tau)
+                    One = 0.5*(np.exp(-t/tau)*exp(fwhm_mod**2/(2*tau))/tau)
                     Two = 1 + erf((t-(fwhm_mod**2/tau))/(sqrt(2)*fwhm_mod))
                     D[i, j] = One*Two
                 else:
                     if self.FWHM_mod != 0:
-                        One = 0.5*(exp(-t/tau)*exp(self.FWHM_mod**2/(2*tau))/tau)
+                        One = 0.5*(np.exp(-t/tau)*exp(self.FWHM_mod**2/(2*tau))/tau)
                         Two = 1 + erf((t-(self.FWHM_mod**2/tau))/(sqrt(2)*self.FWHM_mod))
                         D[i, j] = One*Two
                     else:
-                        D[i, j] = exp(-t/tau)
+                        D[i, j] = np.exp(-t/tau)
         return D
         
     def _getDAS(self, D, Y, alpha=0):
@@ -113,7 +109,7 @@ class SVD_GA(object):
     def _min(self, taus, Y, T, alpha, fit_irf):
         D = self._genD(taus, T, fit_irf)
         DAS = self._getDAS(D, Y, alpha)
-        res = sum((Y - D.dot(DAS))**2)
+        res = np.sum((Y - D.dot(DAS))**2)
         return res
 
     def _GA(self, x0, Y, T, alpha, B, fit_irf):
@@ -121,12 +117,13 @@ class SVD_GA(object):
         taus = result.x
         D = self._genD(taus, T, fit_irf)
         DAS = self._getDAS(D, Y, alpha)
-        print(taus)
         return taus, DAS, D.dot(DAS)
 
     def Global(self, wLSVs, x0, B, alpha, fit_irf=False, fwhm=None):
         wLSV_indices, wLSV_fit = self._get_wLSVs_for_fit(wLSVs, B)
+        print('Singular vectors for fit: {}'.format(wLSV_indices))
         taus, DAS, SpecFit = self._GA(x0, wLSV_fit, self.T, alpha, B, fit_irf)
+        print('Fitted lifetimes: {}'.format(taus))
         if fit_irf:
             self._plot_res(wLSV_fit, wLSV_indices, taus[:-1], DAS, SpecFit, self.T)
             fwhm = taus[-1]
@@ -138,9 +135,8 @@ class SVD_GA(object):
         wLSV_indices = wLSV_indices.split()
         if wLSV_indices: # List as condition returns true if not empty
             wLSV_indices = list(map(int, wLSV_indices))
-            print(wLSV_indices)
-            if wLSV_indices == None:
-                if B != None:
+            if wLSV_indices is None:
+                if B is not None:
                     wLSV_fit = self.wLSV[:, :len(B)]
                 else:
                     wLSV_fit = self.wLSV[:, :3]
