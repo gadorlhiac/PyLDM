@@ -372,6 +372,7 @@ class Main(tk.Frame):
     def svd_GA(self):
         x0, bounds = self.getGAparams()
         self.GA_taus = self.SVD.Global(self.svdwLSVs.get(), x0, bounds, float(self.svdAlphavar.get()))
+        print(self.GA_taus)
         plt.show()
         plt.close()
 
@@ -513,4 +514,3 @@ class Main(tk.Frame):
                 F[j, j+1] = -1
             L = np.concatenate((I, F))
             return L
-

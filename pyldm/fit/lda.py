@@ -49,6 +49,7 @@ class LDA(object):
             self._plot_GCV_Cp(Cps)
         elif self.reg == 'elnet':
             self._elnet()
+        print(GA_taus)
         self._plot_LDM(GA_taus)
 
     def replot(self, GA_taus=None, num_c=10):
@@ -529,4 +530,3 @@ class LDA(object):
         self.S2.on_changed(update)
         if self.reg == 'elnet':
             self.S3.on_changed(update)
-        plt.show()

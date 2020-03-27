@@ -178,4 +178,3 @@ class SVD_GA(object):
             ax2.legend(loc=0, frameon=False)
             plt.draw()
         self.S.on_changed(update)
-        plt.show()
